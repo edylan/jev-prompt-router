@@ -1,0 +1,53 @@
+
+=== 2026-09-20 22:33:54 /home/dylan/Development/prompt-splitter/.venv/bin/python /home/dylan/Development/prompt-splitter/eval/simulate_results.py --data /home/dylan/Development/prompt-splitter/eval/../datasets/v2/business-prompts-v2.jsonl --out eval/results/ui2.jsonl --split test --delay 0.05 --slice business --limit 20 ===
+wrote 20 SIMULATED results -> eval/results/ui2.jsonl (not real Jev output)
+
+=== 2026-09-20 22:34:57 /home/dylan/Development/prompt-splitter/.venv/bin/python /home/dylan/Development/prompt-splitter/eval/simulate_results.py --data /home/dylan/Development/prompt-splitter/eval/../datasets/v2/business-prompts-v2.jsonl --out eval/results/test.jsonl --split development --delay 0.05 ===
+  25/279
+  50/279
+  75/279
+  100/279
+  125/279
+  150/279
+  175/279
+  200/279
+  225/279
+  250/279
+  275/279
+wrote 279 SIMULATED results -> eval/results/test.jsonl (not real Jev output)
+
+=== 2026-09-20 22:41:26 /home/dylan/Development/prompt-splitter/.venv/bin/python /home/dylan/Development/prompt-splitter/eval/simulate_results.py --data /home/dylan/Development/prompt-splitter/eval/../datasets/v2/business-prompts-v2.jsonl --out eval/results/bmtest.jsonl --split test --delay 0.05 --slice business --limit 80 ===
+  25/80
+  50/80
+  75/80
+wrote 80 SIMULATED results -> eval/results/bmtest.jsonl (not real Jev output)
+
+=== 2026-09-20 22:46:21 /home/dylan/Development/prompt-splitter/.venv/bin/python /home/dylan/Development/prompt-splitter/eval/jev_runner.py --data /home/dylan/Development/prompt-splitter/eval/../datasets/v2/business-prompts-v2.jsonl --out eval/results/test.jsonl --split test --concurrency 6 --order interleave ===
+rows=649 todo=649 (already done: 0)  model=jev-latest concurrency=6 rubric=v2.0
+output=eval/results/test.jsonl
+  25/649   42.5/s
+  50/649   45.9/s
+  75/649   46.2/s
+  100/649   48.2/s
+  125/649   48.8/s
+  150/649   50.1/s
+  175/649   50.5/s
+  200/649   50.3/s
+  225/649   50.7/s
+  250/649   51.2/s
+  275/649   51.1/s
+  300/649   51.6/s
+  325/649   51.6/s
+  350/649   51.7/s
+  375/649   52.2/s
+  400/649   52.2/s
+  425/649   51.9/s
+  450/649   52.3/s
+  475/649   52.1/s
+  500/649   52.4/s
+  525/649   52.7/s
+  550/649   52.6/s
+  575/649   52.7/s
+  600/649   52.9/s
+  625/649   52.8/s
+done 649 in 12.3s -> eval/results/test.jsonl
