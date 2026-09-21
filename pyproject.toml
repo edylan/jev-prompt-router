@@ -1,0 +1,12 @@
+[project]
+name = "fillm"
+version = "0.0.0"
+description = "Inference routing for the enterprise: capability-aware LLM routing and cost visibility."
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+jev = ["typesafe-sdk"]
+
+[tool.ruff]
+line-length = 160

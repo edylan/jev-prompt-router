@@ -1,6 +1,6 @@
-# RouteHive *(working name — see `docs/design.md`)*
+# Fillm
 
-Silent, capability-aware LLM routing for enterprise fleets. An agent is pushed
+**Inference routing for the enterprise.** Silent, capability-aware LLM routing for enterprise fleets. An agent is pushed
 to employee machines, intercepts LLM traffic from coding/agent harnesses
 (Claude Code, Codex, pi, …), classifies what each prompt actually needs, and
 routes it to the cheapest model that can do the job — while giving CIOs the

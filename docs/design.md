@@ -1,4 +1,4 @@
-# RouteHive — Design Decisions (working name)
+# Fillm — Design Decisions
 
 Status: alignment phase. No routing proxy or dashboard yet. Next input: 1,000-prompt
 synthetic dataset with gold labels.

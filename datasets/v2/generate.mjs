@@ -1,4 +1,4 @@
-// Prompt Splitter — dataset v2 generator.
+// Fillm — dataset v2 generator.
 //
 // Goals (see ../../docs/dataset-review.md):
 //   - template-level, stratified dev/test split (no template spans the split)
