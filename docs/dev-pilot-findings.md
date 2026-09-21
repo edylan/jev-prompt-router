@@ -87,3 +87,54 @@ and T2 for all T2). n=24 over 8 templates, so treat as a hint only.
    whether our own rubric would label them the same way twice.
 3. **Re-run dev**, compare against the same baselines, and only then consider the
    blind test.
+
+---
+
+# Update — label audit + rubric v2.0 (same day)
+
+## Audit
+
+- **Category alone predicts only 33.7%** of the tier, so the benchmark is not
+  purely topical. Categories are tier-mixed (modal share 35–67%).
+- **The T1/T2 boundary is genuinely inconsistent.** Closest same-category pairs
+  include "adapt an approved announcement for 2 audiences" (T1) vs "for 3
+  audiences" (T2), and "classify against 15 categories" (T1) vs "against 25"
+  (T2). The labels were partly encoding **volume**, which is not a capability
+  difference. T2/T3 pairs were more defensible.
+- So part of Jev's v1 error — 62 of 80 T1 rows pushed to T2 — was the label's
+  fault, not only the model's.
+
+## Redesign: rubric v2.0 (decomposed)
+
+One holistic 4-way Choice replaced by four atomic Nouls in a single request,
+combined in code: `single_step`, `multistep`, `deep`, `context`. Boundary rules
+now state explicitly that volume/length is not a capability difference, and that
+T1 is light synthesis with more context/constraints while T2 is genuine
+multi-step reasoning.
+
+## Result (dev, 279 rows)
+
+| | accuracy | macro F1 | T3 recall | cost error |
+| --- | --- | --- | --- | --- |
+| v1 single Choice | 62.0% | 0.593 | 38.1% | 0.624 |
+| v2 decomposed, 0.5 thresholds | 48.7% | 0.437 | 100.0% | 0.631 |
+| **v2 decomposed, tuned (0.8/0.8/0.4/0.4)** | **84.6%** | **0.842** | **95.2%** | **0.197** |
+| v2 tuned, template-level 5-fold CV | 83.0% | — | 96.9% | 0.234 |
+| naive Bayes (bar) | 78.9% | 0.788 | 92.9% | 0.444 |
+
+The Noul signal is clean: `single_step` is 0.68 for T0 vs 0.04–0.18 elsewhere;
+`deep` is 0.91 for T3 vs 0.10–0.55 below. Tuned confusion is 82/85 T0, 44/80 T1,
+70/72 T2, 40/42 T3.
+
+## Caveats
+
+- Thresholds were tuned on dev; the CV figure (83.0%) is the honest one. The
+  blind test is still the real measurement.
+- **T1 remains the weak class (44/80)** — exactly where the audit found label
+  noise. The ceiling here is our labels, not Jev.
+- Noul values are stored per result, so re-tuning the mapping costs no API calls.
+
+## Next
+
+Run the blind test split with rubric v2.0 and the tuned mapping, report against
+the same four baselines, then the empirical cascade.

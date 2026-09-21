@@ -32,16 +32,42 @@ QUESTION = ("What is the minimum model capability tier sufficient to complete th
             "professionally, assuming the model receives the referenced materials and ordinary tools named "
             "in the request?")
 RUBRIC_VERSION = "inline"
+RUBRIC_MODE = "choice"
+RUBRIC = {"mode": "choice", "criteria": TIER_DEFS, "question": QUESTION}
 
-# The frozen rubric lives in eval/rubric.json and is the source of truth. The
-# inline values above are only a fallback if the file is missing.
+# The rubric lives in eval/rubric.json and is the source of truth. The inline
+# values above are only a fallback if the file is missing.
 _RUBRIC_PATH = os.path.join(HERE, "rubric.json")
 if os.path.exists(_RUBRIC_PATH):
     with open(_RUBRIC_PATH) as _f:
-        _RUBRIC = json.load(_f)
-    TIER_DEFS = _RUBRIC.get("criteria", TIER_DEFS)
-    QUESTION = _RUBRIC.get("question", QUESTION)
-    RUBRIC_VERSION = _RUBRIC.get("rubric_version", RUBRIC_VERSION)
+        RUBRIC = json.load(_f)
+    RUBRIC_MODE = RUBRIC.get("mode", "choice")
+    TIER_DEFS = RUBRIC.get("criteria", TIER_DEFS)
+    QUESTION = RUBRIC.get("question", QUESTION)
+    RUBRIC_VERSION = RUBRIC.get("rubric_version", RUBRIC_VERSION)
+
+
+def map_tier(nouls):
+    """Composite mapping from decomposed Noul answers to a capability tier.
+    Thresholds are recorded in rubric.json so a run is reproducible."""
+    thr = RUBRIC.get("mapping_thresholds", {})
+    d, m = thr.get("deep", 0.5), thr.get("multistep", 0.5)
+    s, c = thr.get("single_step", 0.5), thr.get("context", 0.5)
+    if nouls.get("deep", 0) >= d:
+        return "T3", ["deep"]
+    if nouls.get("multistep", 0) >= m:
+        return "T2", ["multistep"]
+    if nouls.get("single_step", 0) >= s and nouls.get("context", 0) < c:
+        return "T0", ["single_step", "context"]
+    return "T1", ["multistep", "single_step", "context"]
+
+
+def derived_confidence(nouls, deciding):
+    """Decomposed mode has no Choice distribution; derive a 0.5-1.0 certainty
+    from how far the deciding questions sit from their mapping threshold."""
+    thr = RUBRIC.get("mapping_thresholds", {})
+    margin = max((abs(nouls.get(q, 0.5) - thr.get(q, 0.5)) for q in deciding), default=0.0) * 2
+    return round(0.5 + 0.5 * min(1.0, margin), 3)
 
 
 def load_dotenv(path):
@@ -84,23 +110,37 @@ async def classify_one(client, sem, row, prompt_field, policy, models):
             "jev": {"error": None}, "route": None, "correct": None, "cost_weight": None,
         }
         try:
-            from typesafe_sdk import Choice
-            res = await client.system_one(row[prompt_field], {"tier": Choice(instructions=QUESTION, criteria=TIER_DEFS)})
-            ans = res.choices["tier"]
+            if RUBRIC_MODE == "decomposed":
+                from typesafe_sdk import Noul
+                qs = {name: Noul(instructions=spec["instructions"]) for name, spec in RUBRIC["questions"].items()}
+                res = await client.system_one(row[prompt_field], qs)
+                nouls = {k: float(res.nouls[k].noul) for k in qs}
+                choice, deciding = map_tier(nouls)
+                conf = derived_confidence(nouls, deciding)
+                probs = {}
+            else:
+                from typesafe_sdk import Choice
+                res = await client.system_one(row[prompt_field], {"tier": Choice(instructions=QUESTION, criteria=TIER_DEFS)})
+                ans = res.choices["tier"]
+                nouls = None
+                choice = ans.choice
+                conf = getattr(ans, "confidence", None)
+                probs = dict(getattr(ans, "probabilities", {}) or {})
             usage = getattr(res, "usage", None)
             rec["jev"] = {
-                "choice": ans.choice,
-                "confidence": getattr(ans, "confidence", None),
-                "probabilities": dict(getattr(ans, "probabilities", {}) or {}),
+                "choice": choice,
+                "confidence": conf,
+                "probabilities": probs,
+                "nouls": nouls,
                 "model": getattr(res, "model", None),
                 "input_tokens": getattr(usage, "input_tokens", None) if usage else None,
                 "output_tokens": getattr(usage, "output_tokens", None) if usage else None,
                 "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
                 "error": None,
             }
-            if ans.choice in ("T0", "T1", "T2", "T3"):
-                rec["route"] = route_row(row, ans.choice, rec["jev"]["confidence"], policy, models)
-                rec["correct"] = ans.choice == row["gold_tier"]
+            if choice in ("T0", "T1", "T2", "T3"):
+                rec["route"] = route_row(row, choice, rec["jev"]["confidence"], policy, models)
+                rec["correct"] = choice == row["gold_tier"]
         except Exception as e:  # noqa: BLE001
             rec["jev"] = {"error": f"{type(e).__name__}: {e}", "latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
         return rec
@@ -132,10 +172,13 @@ async def run(args):
 
     if args.dry_run:
         print("\n--- dry run: request payload for the first row ---")
+        if RUBRIC_MODE == "decomposed":
+            qs = {name: {"type": "noul", "instructions": spec["instructions"]} for name, spec in RUBRIC["questions"].items()}
+        else:
+            qs = {"tier": {"type": "choice", "instructions": QUESTION, "criteria": TIER_DEFS}}
         print(json.dumps({"state": todo[0][prompt_field] if todo else rows[0][prompt_field],
-                          "model": args.model,
-                          "questions": {"tier": {"type": "choice", "instructions": QUESTION, "criteria": TIER_DEFS}}}, indent=2)[:4000])
-        print("\nDry run only. No API call was made.")
+                          "model": args.model, "questions": qs}, indent=2)[:4000])
+        print(f"\nrubric v{RUBRIC_VERSION} mode={RUBRIC_MODE}. Dry run only. No API call was made.")
         return 0
 
     from typesafe_sdk import AsyncTypeSafeClient
