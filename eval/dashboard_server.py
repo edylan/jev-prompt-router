@@ -66,6 +66,26 @@ def run_status():
     }
 
 
+def interleave(rows):
+    """Same deterministic order as jev_runner --order interleave (round-robin by tier)."""
+    buckets = {t: [r for r in rows if r["gold_tier"] == t] for t in ("T0", "T1", "T2", "T3")}
+    out = []
+    while any(buckets.values()):
+        for t in ("T0", "T1", "T2", "T3"):
+            if buckets[t]:
+                out.append(buckets[t].pop(0))
+    return out
+
+
+def select_run_rows(rows, split, slice_, limit):
+    """Mirror how the runner selects rows, so the progress bar matches the run."""
+    r = [x for x in rows if not slice_ or x.get("prompt_style") == slice_]
+    if split and split != "all":
+        r = [x for x in r if x["split"] == split]
+    r = interleave(r)
+    return r[:limit] if limit else r
+
+
 def build_cmd(o):
     results = STATE["results"]
     if o.get("reset"):
@@ -114,7 +134,9 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 policy, models = STATE["policy"], STATE["models"]
                 results = read_results(STATE["results"])
-                by_id = {r["id"]: r for r in STATE["rows"]}
+                active = STATE.get("active_ids")
+                rows = [r for r in STATE["rows"] if r["id"] in active] if active else STATE["rows"]
+                by_id = {r["id"]: r for r in rows}
                 light = {}
                 for k, rec in results.items():
                     lite = {kk: vv for kk, vv in rec.items() if kk != "prompt"}
@@ -126,9 +148,9 @@ class Handler(BaseHTTPRequestHandler):
                         lite["jev"] = {**j, "choice": tier}
                         lite["correct"] = tier == row["gold_tier"]
                     light[k] = lite
-                summary = summarize(STATE["rows"], results, policy, models)
+                summary = summarize(rows, results, policy, models)
                 self._send(200, json.dumps({
-                    "rows": STATE["rows"], "results": light, "summary": summary,
+                    "rows": rows, "results": light, "summary": summary,
                     "policy": policy,
                     "models": [{"id": m["id"], "display": m["display"], "capability_tier": m["capability_tier"], "cost_band": m["cost_band"], "origin": m["origin"], "vendor": m["vendor"], "serving_locus": m["serving_locus"], "input_usd_per_mtok": m["input_usd_per_mtok"], "output_usd_per_mtok": m["output_usd_per_mtok"]} for m in models],
                     "pricing": {"source": STATE["registry_doc"].get("pricing_source"), "fetched_at": STATE["registry_doc"].get("pricing_fetched_at"), "note": STATE["registry_doc"].get("note")},
@@ -178,6 +200,7 @@ class Handler(BaseHTTPRequestHandler):
                     "reset": bool(body.get("reset", True)),
                 }
                 os.makedirs(os.path.dirname(STATE["results"]), exist_ok=True)
+                STATE["active_ids"] = {r["id"] for r in select_run_rows(STATE["rows"], o["split"], o["slice"], o["limit"])}
                 cmd = build_cmd(o)
                 STATE["log"] = os.path.join(HERE, "results", "run.log")
                 logf = open(STATE["log"], "a")
@@ -230,6 +253,7 @@ def main():
         "models": registry_doc["models"], "registry_doc": registry_doc, "generated_at": "2026-09-21",
         "simulated": "sim" in os.path.basename(a.results),
         "proc": None, "mode": None, "run_opts": None, "started_at": None,
+        "active_ids": None,
         "last_returncode": None, "last_elapsed": None, "can_run": not a.disable_run,
         "log": os.path.join(HERE, "results", "run.log"),
     })
