@@ -1,0 +1,26 @@
+{
+  "rubric_version": "1.0",
+  "frozen_at": "2026-09-21",
+  "status": "frozen",
+  "answer_semantics": "minimum_sufficient_tier",
+  "question": "What is the minimum model capability tier sufficient to complete this request reliably and professionally, assuming the model receives the referenced materials and ordinary tools named in the request?",
+  "criteria": {
+    "T0": "A capable local model of roughly 12B parameters or less. Bounded rewriting, extraction, formatting, simple code, and clear single-step tasks with limited context.",
+    "T1": "An inexpensive hosted general model. A small local model is not dependable enough because of context size, instruction density, synthesis, or polish, but advanced reasoning is not required.",
+    "T2": "A high-capability, cost-efficient cloud model. Reliable multi-step synthesis, professional analysis, repository work, tool use, and moderately complex judgment.",
+    "T3": "A premium frontier or deliberate-reasoning model. Deep ambiguity, long-horizon planning, high-stakes judgment, complex cross-system work, or tasks where under-routing is costly."
+  },
+  "boundary_rules": [
+    "Choose the minimum tier, not the best possible answer.",
+    "Judge only the intrinsic capability the request needs; ignore vendor, price, and the requester's organization.",
+    "If two tiers could both work, choose the lower one only when the task is a clear single step with limited context.",
+    "Treat deep ambiguity, conflicting evidence, cross-system integration, long-horizon planning, or high-stakes judgment as T3.",
+    "A request that merely names tools or attachments does not raise the tier by itself; the required judgment does."
+  ],
+  "frozen_decisions": {
+    "escalate_below_confidence": 0.60,
+    "baseline_model_id": "anthropic/claude-opus-4.5",
+    "state_field": "prompt",
+    "note": "Frozen before the blind test split. The development split is for validating this rubric, not changing it; any change requires a new rubric_version."
+  }
+}

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prompt Splitter — Jev routing inbox</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --panel2:#161e29; --line:#233043; --text:#e6edf6; --dim:#8ea1b8; --faint:#5b6b80;
+    --t0:#22c55e; --t1:#38bdf8; --t2:#f59e0b; --t3:#ef4444; --ok:#22c55e; --bad:#ef4444; --accent:#7c9cff;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#0d131b,#0d131bee);border-bottom:1px solid var(--line);padding:12px 18px}
+  .row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand{font-weight:700;letter-spacing:.2px}
+  .brand small{color:var(--dim);font-weight:400;margin-left:8px}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+  .badge.sim{background:#3b2b06;border-color:#7a5a10;color:#fbbf24}
+  .badge.live{background:#062e1c;border-color:#0f6b3f;color:#4ade80}
+  .badge.run{background:#0b2a3b;border-color:#155e75;color:#67e8f9}
+  .grow{flex:1}
+  .progress{height:8px;background:#0a0f16;border:1px solid var(--line);border-radius:999px;overflow:hidden;min-width:180px;flex:1}
+  .progress>i{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#22c55e);width:0;transition:width .5s}
+  .stat{color:var(--dim);font-variant-numeric:tabular-nums}
+  main{padding:18px}
+  .grid{display:grid;gap:14px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card .k{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .card .v{font-size:24px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .card .s{color:var(--faint);font-size:12px;margin-top:2px}
+  .card.hero{background:linear-gradient(135deg,#0d2a1d,#121821);border-color:#175c39}
+  .card.hero .v{color:#4ade80}
+  .panels{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .panel h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim)}
+  .tierchip{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;color:#06121f}
+  .t0{background:var(--t0)}.t1{background:var(--t1)}.t2{background:var(--t2)}.t3{background:var(--t3);color:#fff}
+  .mixbar{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .mixbar>span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#06121f;overflow:hidden}
+  .bar-row{display:grid;grid-template-columns:150px 1fr 70px;gap:10px;align-items:center;margin:5px 0;font-size:12px}
+  .bar-track{background:#0a0f16;border:1px solid var(--line);border-radius:6px;height:18px;overflow:hidden}
+  .bar-fill{height:100%;background:var(--accent)}
+  .hist{display:flex;align-items:flex-end;gap:4px;height:90px}
+  .hist>div{flex:1;background:#1f6feb;border-radius:3px 3px 0 0;min-height:2px}
+  .hist span{display:block;text-align:center;color:var(--faint);font-size:10px;margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+  th{position:sticky;top:58px;background:#0e141d;z-index:10;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  tbody tr:hover{background:#141c27}
+  tbody tr.pending{opacity:.35}
+  tbody tr.error{background:#2a0e0e}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .prompt{font-family:var(--mono);font-size:12px;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;max-width:560px}
+  .prompt.open{-webkit-line-clamp:unset}
+  .tags{margin-top:3px;display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .dist{display:flex;height:12px;width:96px;border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+  .dist>span{height:100%}
+  .conf{display:flex;align-items:center;gap:6px}
+  .conf .track{width:44px;height:6px;background:#0a0f16;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .conf .fill{height:100%;background:var(--accent)}
+  .verdict{font-weight:700}
+  .ok{color:var(--ok);font-weight:700}.bad{color:var(--bad);font-weight:700}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 10px}
+  input,select,button{background:#0e141d;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font:inherit}
+  button{cursor:pointer}
+  button.primary{background:linear-gradient(180deg,#1d4ed8,#1e40af);border-color:#2563eb;font-weight:700;padding:8px 16px}
+  button.primary:disabled{opacity:.4;cursor:not-allowed}
+  button.danger{border-color:#7f1d1d;color:#fca5a5}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;color:var(--dim);font-size:12px;align-items:center}
+  .note{color:var(--faint);font-size:12px;margin-top:6px}
+  .functable td,.functable th{padding:5px 8px;font-size:12px}
+  .controls{background:linear-gradient(180deg,#101822,#121821)}
+  .ctrlgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 16px}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
+  .toggle input[type=range]{flex:1;accent-color:var(--accent)}
+  .toggle select,.toggle input[type=number]{padding:5px 7px}
+  .rungrid{display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:12px}
+  .runwrap{background:#0a0f16;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;display:none}
+  .runwrap.on{display:block}
+  pre.log{margin:8px 0 0;max-height:150px;overflow:auto;background:#080c11;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:var(--mono);font-size:11px;color:#9fb3c8;white-space:pre-wrap}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+  .pill.on{background:#062e1c;border-color:#0f6b3f;color:#4ade80}
+  .pill.off{background:#2a0e0e;border-color:#7f1d1d;color:#fca5a5}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="brand">Prompt Splitter <small>Jev capability router — live inbox</small></div>
+    <span id="mode" class="badge live">LIVE</span>
+    <span id="runbadge" class="badge run" style="display:none">RUNNING</span>
+    <span class="pill" id="baselineTag" title="The counterfactual all-premium baseline used for the savings figure">baseline —</span>
+    <div class="grow"></div>
+    <div class="progress"><i id="prog"></i></div>
+    <div class="stat" id="progtext">0 / 0</div>
+  </div>
+</header>
+
+<main>
+  <section class="panel controls" style="margin-bottom:14px">
+    <div class="row"><h3 style="margin:0">Routing policy</h3><span class="grow"></span>
+      <span class="pill" id="polCN">—</span><button id="btnPolicyReset" style="padding:3px 10px">reset</button></div>
+    <div class="ctrlgrid" style="margin-top:10px">
+      <label class="toggle"><input type="checkbox" id="pCN"> Allow CN-origin models <span class="tag">DeepSeek · Qwen</span></label>
+      <label class="toggle"><input type="checkbox" id="pHS"> High-sensitivity requires allowlist</label>
+      <label class="toggle"><input type="checkbox" id="pRes"> Enforce data residency</label>
+      <label class="toggle">Escalate below <input type="range" id="pThr" min="0" max="1" step="0.05" value="0.6"> <span class="stat" id="pThrVal">0.60</span></label>
+      <label class="toggle">Frontier baseline <select id="pBase"></select></label>
+    </div>
+
+    <div class="rungrid" style="margin-top:12px">
+      <label class="toggle">Mode
+        <select id="runMode">
+          <option value="sim">Simulated rehearsal (no API)</option>
+          <option value="real">Jev — real API</option>
+        </select></label>
+      <label class="toggle">Split
+        <select id="runSplit"><option value="development">development</option><option value="test">test</option><option value="all">all</option></select></label>
+      <label class="toggle">Slice
+        <select id="runSlice"><option value="">all</option><option value="business">business</option><option value="harness">harness</option></select></label>
+      <label class="toggle">Limit <input type="number" id="runLimit" min="0" placeholder="all" style="width:78px"></label>
+      <label class="toggle">Concurrency <input type="number" id="runConc" min="1" max="16" value="6" style="width:60px"></label>
+      <label class="toggle"><input type="checkbox" id="runReset" checked> clear results first</label>
+      <button id="btnStart" class="primary">▶ Start classification</button>
+      <button id="btnStop" class="danger" disabled>■ Stop</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="stat" id="runStatus">idle</span><span class="grow"></span><span class="stat" id="runHint"></span>
+    </div>
+    <div class="runwrap" id="runwrap"><pre class="log" id="runLog"></pre></div>
+  </section>
+
+  <div class="grid cards" id="cards"></div>
+  <p class="note" id="headline"></p>
+  <p class="note" id="caveat"></p>
+
+  <div class="grid panels" style="margin-top:14px">
+    <div class="panel"><h3>Capability mix — required (gold) vs routed (Jev)</h3><div id="tiermix"></div>
+      <div class="legend" style="margin-top:10px">
+        <span><b class="tierchip t0">T0</b> local</span><span><b class="tierchip t1">T1</b> cheap hosted</span>
+        <span><b class="tierchip t2">T2</b> flash-frontier</span><span><b class="tierchip t3">T3</b> frontier</span>
+      </div>
+    </div>
+    <div class="panel"><h3>Confidence distribution</h3><div id="hist"></div><p class="note" id="confnote"></p></div>
+    <div class="panel"><h3>Model mix (routed)</h3><div id="modelmix"></div></div>
+    <div class="panel"><h3>Cost band mix (routed)</h3><div id="bandmix"></div><p class="note">C0 local · C1 value · C2 standard · C3 premium</p></div>
+  </div>
+
+  <div class="panel" style="margin-top:14px"><h3>Per business function</h3><div id="functable"></div></div>
+
+  <div class="panel" style="margin-top:14px">
+    <h3>Prompt inbox <span class="stat" id="inboxcount"></span></h3>
+    <div class="toolbar">
+      <input id="search" placeholder="Search prompt / id / model…" style="min-width:260px" />
+      <select id="fTier"><option value="">All gold tiers</option><option>T0</option><option>T1</option><option>T2</option><option>T3</option></select>
+      <select id="fStatus"><option value="">All statuses</option><option value="done">Classified</option><option value="pending">Pending</option><option value="error">Error</option></select>
+      <select id="fStyle"><option value="">All styles</option><option value="business">business</option><option value="harness">harness</option></select>
+      <label class="stat"><input type="checkbox" id="fWrong" /> mismatches only</label>
+      <label class="stat"><input type="checkbox" id="fHidePending" /> hide pending</label>
+    </div>
+    <div style="overflow:auto;max-height:70vh">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Status</th><th>Prompt</th><th>Gold</th><th>Jev verdict</th><th>Distribution</th>
+          <th>Routed model</th><th>Est. cost</th><th>Saved</th><th>Latency</th><th>Match</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="note">Costs are estimates from illustrative list prices in <code>eval/model_registry.json</code>; labels are a synthetic rubric prior. Not proof of model adequacy.</p>
+  </div>
+</main>
+
+<script>
+const TIERS=['T0','T1','T2','T3'];
+const CLS={T0:'t0',T1:'t1',T2:'t2',T3:'t3'};
+const COLOR={T0:'#22c55e',T1:'#38bdf8',T2:'#f59e0b',T3:'#ef4444'};
+let ROWS=[],RESULTS={},SUMMARY=null,POLICY={},MODELS=[],RUN={},LOG='',PRICING={},rowEls=new Map(),rowData=new Map(),patched=new Set(),booted=false,lastSig=null,basePop=false;
+const $=(s)=>document.querySelector(s);
+const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const usd=(v)=>{v=v||0; if(v===0)return '$0'; if(Math.abs(v)<0.01)return '$'+v.toFixed(4); if(Math.abs(v)<1)return '$'+v.toFixed(3); return '$'+v.toFixed(2);};
+const pct=(v)=>(100*(v||0)).toFixed(1)+'%';
+const post=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(r=>r.json()).catch(()=>null);
+
+async function poll(){
+  try{
+    const s=await (await fetch('/api/state',{cache:'no-store'})).json();
+    if(!booted){
+      ROWS=s.rows;ROWS.forEach(r=>rowData.set(r.id,r));buildTable();booted=true;
+      $('#mode').textContent=s.meta.simulated?'SIMULATED':'LIVE';
+      $('#mode').className='badge '+(s.meta.simulated?'sim':'live');
+      populateBaselines();
+    }
+    RESULTS=s.results;SUMMARY=s.summary;POLICY=s.policy||{};MODELS=s.models||[];RUN=s.run||{};LOG=s.log||'';PRICING=s.pricing||{};
+    if(s.meta.policy_sig!==lastSig){ lastSig=s.meta.policy_sig; syncControls(); patched.clear(); }
+    renderBaseline();
+    if(s.meta.can_run===false){ $('#btnStart').disabled=true; $('#runHint').textContent='run disabled (server --disable-run)'; }
+    paintSummary();patchNew();renderRun();
+  }catch(e){/* server restarting */}
+  setTimeout(poll,900);
+}
+
+function populateBaselines(){
+  if(basePop)return;basePop=true;const sel=$('#pBase');sel.innerHTML='';
+  MODELS.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.display;sel.appendChild(o);});
+}
+
+function syncControls(){
+  $('#pCN').checked=!!POLICY.allow_cn_origin;
+  $('#pHS').checked=POLICY.high_sensitivity_requires_allowlist!==false;
+  $('#pRes').checked=!!POLICY.enforce_residency;
+  const thr=POLICY.escalate_below_confidence??0.6;
+  $('#pThr').value=thr;$('#pThrVal').textContent=Number(thr).toFixed(2);
+  if(POLICY.baseline_model_id)$('#pBase').value=POLICY.baseline_model_id;
+  const cn=!!POLICY.allow_cn_origin;
+  $('#polCN').textContent=cn?'CN-origin models allowed':'CN-origin models blocked';
+  $('#polCN').className='pill '+(cn?'on':'off');
+}
+
+async function pushPolicy(){ await post('/api/policy',policyPayload()); await poll(); }
+function policyPayload(){
+  return {allow_cn_origin:$('#pCN').checked,
+          high_sensitivity_requires_allowlist:$('#pHS').checked,
+          enforce_residency:$('#pRes').checked,
+          escalate_below_confidence:parseFloat($('#pThr').value),
+          baseline_model_id:$('#pBase').value};
+}
+['pCN','pHS','pRes','pBase'].forEach(id=>document.getElementById(id).addEventListener('change',pushPolicy));
+$('#pThr').addEventListener('input',()=>{$('#pThrVal').textContent=Number($('#pThr').value).toFixed(2);});
+$('#pThr').addEventListener('change',pushPolicy);
+$('#btnPolicyReset').addEventListener('click',async()=>{await post('/api/policy/reset',{});await poll();});
+
+async function startRun(){
+  const mode=$('#runMode').value;
+  if(mode==='real'&&!confirm('Real Jev run: this calls the TypeSafe API and spends credits. Continue?'))return;
+  $('#btnStart').disabled=true;
+  const r=await post('/api/run',{mode,split:$('#runSplit').value,slice:$('#runSlice').value||null,
+    limit:parseInt($('#runLimit').value||'0',10),concurrency:parseInt($('#runConc').value||'6',10),reset:$('#runReset').checked});
+  if(r&&r.error)alert(r.error);
+  await poll();
+}
+async function stopRun(){ $('#btnStop').disabled=true; await post('/api/stop',{}); await poll(); }
+$('#btnStart').addEventListener('click',startRun);
+$('#btnStop').addEventListener('click',stopRun);
+
+function renderRun(){
+  const running=!!RUN.running;
+  $('#btnStart').disabled=running;
+  $('#btnStop').disabled=!running;
+  $('#runbadge').style.display=running?'':'none';
+  $('#runwrap').className='runwrap'+(LOG?' on':'');
+  $('#runLog').textContent=LOG?LOG.split('\n').slice(-40).join('\n'):'';
+  if(running)$('#runStatus').innerHTML=`<span class="ok">● running</span> ${RUN.mode||''} · ${RUN.elapsed_s??0}s · pid ${RUN.pid??'—'}`;
+  else if(RUN.returncode!=null)$('#runStatus').innerHTML=`stopped (exit ${RUN.returncode})`;
+  else $('#runStatus').textContent='idle';
+  if(!$('#runHint').textContent)$('#runHint').textContent='Real mode spends API credits. Simulated rehearsal is free.';
+}
+
+function patchNew(){ for(const id in RESULTS){ if(patched.has(id))continue; patched.add(id); patchRow(RESULTS[id]); } applyFilters(); }
+
+function buildTable(){
+  const tb=$('#tbody');tb.innerHTML='';const frag=document.createDocumentFragment();
+  ROWS.forEach((r,i)=>{
+    const tr=document.createElement('tr');tr.id='row-'+r.id;tr.className='pending';
+    tr.innerHTML=`
+      <td class="num">${i+1}</td><td class="status">·</td>
+      <td><div class="prompt">${esc(r.prompt)}</div>
+          <div class="tags"><span class="tag">${esc(r.category||'')}</span><span class="tag">${esc(r.business_function||'')}</span>${r.prompt_style==='harness'?`<span class="tag">${esc(r.harness||'harness')}</span>`:''}<span class="tag">${esc(r.split)}</span></div></td>
+      <td>${tierChip(r.gold_tier)}</td><td class="verdict-cell">—</td><td class="dist-cell"><span class="stat">awaiting</span></td>
+      <td class="model-cell">—</td><td class="num cost-cell">—</td><td class="num saved-cell">—</td><td class="num lat-cell">—</td><td class="match-cell">—</td>`;
+    frag.appendChild(tr);rowEls.set(r.id,tr);
+  });
+  tb.appendChild(frag);
+  tb.addEventListener('click',(e)=>{const p=e.target.closest('.prompt');if(p)p.classList.toggle('open');});
+}
+function tierChip(t,extra=''){return t?`<span class="tierchip ${CLS[t]}">${t}${extra}</span>`:'<span class="stat">—</span>';}
+
+function patchRow(rec){
+  const tr=rowEls.get(rec.id);if(!tr)return;
+  const j=rec.jev||{},rt=rec.route||{};
+  if(j.error){tr.className='error';tr.querySelector('.status').innerHTML='<span class="bad">err</span>';
+    tr.querySelector('.verdict-cell').innerHTML=`<span class="bad" title="${esc(j.error)}">error</span>`;return;}
+  tr.className='';
+  tr.querySelector('.status').innerHTML='<span class="ok">✓</span>';
+  const c=j.confidence??0;
+  tr.querySelector('.verdict-cell').innerHTML=`${tierChip(j.choice)}<div class="conf" style="margin-top:4px"><div class="track"><div class="fill" style="width:${(c*100).toFixed(0)}%"></div></div><span class="stat">${pct(c)}</span></div>`;
+  const pr=j.probabilities||{};
+  const dist=TIERS.map(t=>`<span style="width:${((pr[t]||0)*100).toFixed(1)}%;background:${COLOR[t]}" title="${t} ${pct(pr[t]||0)}"></span>`).join('');
+  tr.querySelector('.dist-cell').innerHTML=`<div class="dist">${dist}</div>`;
+  tr.querySelector('.model-cell').innerHTML=rt.chosen_model_display?`${esc(rt.chosen_model_display)} <span class="tag">${esc(rt.cost_band||'')}${rt.escalated_for_confidence?' ·esc':''}</span>`:'—';
+  tr.querySelector('.cost-cell').textContent=rt.est_cost_usd!=null?usd(rt.est_cost_usd):'—';
+  tr.querySelector('.saved-cell').textContent=rt.saving_usd!=null?usd(rt.saving_usd):'—';
+  tr.querySelector('.lat-cell').textContent=j.latency_ms!=null?j.latency_ms+' ms':'—';
+  tr.querySelector('.match-cell').innerHTML=rec.correct?'<span class="ok">✓</span>':'<span class="bad">✗</span>';
+}
+
+function card(k,v,s,hero){return `<div class="card ${hero?'hero':''}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s||''}</div></div>`;}
+
+function displayOf(id){const m=MODELS.find(x=>x.id===id);return m?m.display:id;}
+
+function renderBaseline(){
+  const bm=MODELS.find(m=>m.id===POLICY.baseline_model_id);
+  $('#baselineTag').textContent='Baseline: '+(bm?bm.display:(POLICY.baseline_model_id||'—'))+(bm?` · $${bm.input_usd_per_mtok}/$${bm.output_usd_per_mtok}`:'');
+  const src=PRICING.fetched_at?` OpenRouter list prices, fetched ${PRICING.fetched_at}.`:' Prices are illustrative.';
+  $('#caveat').innerHTML=`<b>Read this honestly.</b> Savings are an <b>upper bound</b>: they price the routing decision, not the quality of the routed answer — the empirical pass/fail cascade has not been run, so under-routing risk is not priced. The comparison is against <b>${esc(bm?bm.display:(POLICY.baseline_model_id||'a chosen baseline'))}</b>, a <i>chosen</i> counterfactual, not your measured current spend.${src} Contracted rates, batch/cache discounts and regional pricing will differ. Capability tiers and cost bands are our assignment, not the provider's. Labels are a synthetic rubric prior, so accuracy measures agreement with our rubric — not model adequacy.`;
+}
+
+function paintSummary(){
+  const S=SUMMARY;if(!S)return;
+  const p=S.progress,q=S.quality,c=S.cost,cf=S.confidence;
+  $('#prog').style.width=(p.pct*100).toFixed(1)+'%';
+  $('#progtext').textContent=`${p.classified} / ${p.total}`;
+  const t3=q.per_tier?q.per_tier.T3:{};
+  $('#cards').innerHTML=[
+    card('Classified',`${p.classified}`,'of '+p.total+(p.errors?` · ${p.errors} errors`:'')),
+    card('Routing accuracy',q.accuracy!=null?pct(q.accuracy):'—',q.correct!=null?`${q.correct}/${q.n} match the rubric`:''),
+    card('T3 recall (frontier)',t3.recall!=null?pct(t3.recall):'—','frontier-needed prompts caught'),
+    card('Macro F1',q.macro_f1!=null?q.macro_f1.toFixed(3):'—','balanced across tiers'),
+    card('Cost-weighted error',q.cost_weighted_mean!=null?q.cost_weighted_mean.toFixed(3):'—','under-routing penalised 3×'),
+    card('Uncertain',cf.below_threshold!=null?cf.below_threshold:'—',`confidence < ${cf.threshold??'—'}`),
+    card('Escalated',c.escalated!=null?c.escalated:'—','moved up by policy'),
+    card('Baseline spend',c.baseline_usd!=null?usd(c.baseline_usd):'—','every prompt to premium frontier'),
+    card('Routed spend',c.routed_usd!=null?usd(c.routed_usd):'—','cheapest eligible per policy'),
+    card('Savings',c.savings_usd!=null?usd(c.savings_usd):'—',c.savings_pct!=null?pct(c.savings_pct)+' lower':'',true),
+    card('Jev classification cost',c.classification_usd!=null?usd(c.classification_usd):'—',c.jev_input_tokens?`${c.jev_input_tokens.toLocaleString()} input tokens`:''),
+    card('Net savings',c.net_savings_usd!=null?usd(c.net_savings_usd):'—','savings minus routing overhead',true),
+  ].join('');
+  if(c.savings_pct!=null){
+    $('#headline').innerHTML=`Routing <b>${q.n}</b> prompts to the cheapest eligible model is projected to cut inference spend from <b>${usd(c.baseline_usd)}</b> to <b>${usd(c.routed_usd)}</b> (−${pct(c.savings_pct)}), versus the named baseline, a net saving of <b>${usd(c.net_savings_usd)}</b> after <b>${usd(c.classification_usd)}</b> of Jev classification. Oracle (perfect routing) would be <b>${usd(c.oracle_routed_usd)}</b>.`;
+  }
+  const gold=S.mix.gold_tiers||{},jev=S.mix.jev_tiers||{};
+  const tot=(o)=>Object.values(o).reduce((a,b)=>a+b,0);
+  const bar=(obj,T)=>TIERS.map(t=>{const w=T?100*(obj[t]||0)/T:0;return w?`<span style="width:${w}%;background:${COLOR[t]}" title="${t}: ${obj[t]||0}">${w>7?(obj[t]||0):''}</span>`:'';}).join('');
+  $('#tiermix').innerHTML=`<div class="bar-row"><span>Required (gold)</span><div class="mixbar">${bar(gold,tot(gold))}</div><span class="stat">${tot(gold)}</span></div>
+    <div class="bar-row"><span>Routed (Jev)</span><div class="mixbar">${bar(jev,tot(jev))}</div><span class="stat">${tot(jev)}</span></div>`;
+  const h=cf.histogram||[];const max=Math.max(1,...h);
+  $('#hist').innerHTML=`<div class="hist">${h.map((v,i)=>`<div style="height:${Math.max(2,100*v/max)}%" title="${(i/10).toFixed(1)}–${((i+1)/10).toFixed(1)}: ${v}"><span>${i/10}</span></div>`).join('')}</div>`;
+  $('#confnote').textContent=cf.mean!=null?`mean confidence ${cf.mean.toFixed(3)} · ${cf.below_threshold} below threshold ${cf.threshold}`:'';
+  const mm=S.mix.models||{};const mmax=Math.max(1,...Object.values(mm));
+  $('#modelmix').innerHTML=Object.entries(mm).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="bar-row"><span title="${esc(displayOf(k))}">${esc(displayOf(k))}</span><div class="bar-track"><div class="bar-fill" style="width:${100*v/mmax}%"></div></div><span class="stat">${v}</span></div>`).join('')||'<span class="stat">—</span>';
+  const cb=S.mix.cost_bands||{};const cbmax=Math.max(1,...Object.values(cb));
+  $('#bandmix').innerHTML=Object.entries(cb).sort().map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><div class="bar-track"><div class="bar-fill" style="width:${100*v/cbmax}%"></div></div><span class="stat">${v}</span></div>`).join('')||'<span class="stat">—</span>';
+  const rows=Object.entries(S.by_function||{}).sort((a,b)=>b[1].n-a[1].n).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.n}</td><td class="num">${pct(v.accuracy)}</td><td class="num">${usd(v.routed_usd)}</td><td class="num">${usd(v.baseline_usd)}</td><td class="num ok">${usd(v.baseline_usd-v.routed_usd)}</td></tr>`).join('');
+  $('#functable').innerHTML=`<table class="functable"><thead><tr><th>function</th><th>n</th><th>accuracy</th><th>routed</th><th>baseline</th><th>saved</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function applyFilters(){
+  const q=$('#search').value.toLowerCase().trim(),ft=$('#fTier').value,fst=$('#fStatus').value,fs=$('#fStyle').value,wrong=$('#fWrong').checked,hide=$('#fHidePending').checked;
+  let shown=0;
+  ROWS.forEach(r=>{
+    const tr=rowEls.get(r.id);const rec=RESULTS[r.id];const done=!!rec;let ok=true;
+    if(ft&&r.gold_tier!==ft)ok=false;
+    if(fs&&r.prompt_style!==fs)ok=false;
+    if(fst==='done'&&!done)ok=false;
+    if(fst==='pending'&&done)ok=false;
+    if(fst==='error'&&!(rec&&rec.jev&&rec.jev.error))ok=false;
+    if(wrong&&!(done&&rec.correct===false))ok=false;
+    if(hide&&!done)ok=false;
+    if(q){const hay=(r.prompt+' '+r.id+' '+((rec&&rec.route&&rec.route.chosen_model)||'')).toLowerCase();if(!hay.includes(q))ok=false;}
+    tr.style.display=ok?'':'none';if(ok)shown++;
+  });
+  $('#inboxcount').textContent=`— ${shown} shown`;
+}
+['search','fTier','fStatus','fStyle','fWrong','fHidePending'].forEach(id=>{
+  const el=document.getElementById(id);el.addEventListener('input',applyFilters);el.addEventListener('change',applyFilters);
+});
+poll();
+</script>
+</body>
+</html>
