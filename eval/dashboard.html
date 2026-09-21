@@ -194,6 +194,7 @@ const post=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'applica
 async function poll(){
   try{
     const s=await (await fetch('/api/state',{cache:'no-store'})).json();
+    RESULTS=s.results;SUMMARY=s.summary;POLICY=s.policy||{};MODELS=s.models||[];RUN=s.run||{};LOG=s.log||'';PRICING=s.pricing||{};
     if(!booted){
       ROWS=s.rows;ROWS.forEach(r=>rowData.set(r.id,r));buildTable();booted=true;
       $('#mode').textContent=s.meta.simulated?'SIMULATED':'LIVE';
@@ -202,7 +203,6 @@ async function poll(){
       if(s.meta.suggest_split)$('#runSplit').value=s.meta.suggest_split;
       populateBaselines();
     }
-    RESULTS=s.results;SUMMARY=s.summary;POLICY=s.policy||{};MODELS=s.models||[];RUN=s.run||{};LOG=s.log||'';PRICING=s.pricing||{};
     if(s.meta.policy_sig!==lastSig){ lastSig=s.meta.policy_sig; syncControls(); patched.clear(); }
     renderBaseline();
     if(s.meta.can_run===false){ $('#btnStart').disabled=true; $('#runHint').textContent='run disabled (server --disable-run)'; }
@@ -212,8 +212,10 @@ async function poll(){
 }
 
 function populateBaselines(){
-  if(basePop)return;basePop=true;const sel=$('#pBase');sel.innerHTML='';
-  MODELS.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.display;sel.appendChild(o);});
+  const sel=$('#pBase');
+  if(basePop && sel.options.length)return;
+  basePop=true;sel.innerHTML='';
+  MODELS.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=`${m.display} · $${m.input_usd_per_mtok}/$${m.output_usd_per_mtok}`;sel.appendChild(o);});
 }
 
 function syncControls(){
