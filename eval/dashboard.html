@@ -149,6 +149,7 @@
       <label class="toggle"><input type="checkbox" id="runReset" checked> clear results first</label>
       <button id="btnStart" class="primary">▶ Start classification</button>
       <button id="btnStop" class="danger" disabled>■ Stop</button>
+      <button id="btnClear">clear results</button>
     </div>
     <div class="row" style="margin-top:8px">
       <span class="stat" id="runStatus">idle</span><span class="grow"></span><span class="stat" id="runHint"></span>
@@ -289,6 +290,7 @@ async function startRun(){
 async function stopRun(){ $('#btnStop').disabled=true; await post('/api/stop',{}); await poll(); }
 $('#btnStart').addEventListener('click',startRun);
 $('#btnStop').addEventListener('click',stopRun);
+$('#btnClear').addEventListener('click',async()=>{await post('/api/reset',{});booted=false;patched.clear();rowEls.clear();rowData.clear();lastSig=null;await poll();});
 
 function renderRun(){
   const running=!!RUN.running;

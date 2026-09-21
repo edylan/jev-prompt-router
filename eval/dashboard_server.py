@@ -215,6 +215,15 @@ class Handler(BaseHTTPRequestHandler):
                         STATE["policy"][k] = v
                 self._send(200, json.dumps({"policy": STATE["policy"], "policy_sig": policy_sig(STATE["policy"])}))
             return
+        if self.path.startswith("/api/reset"):
+            with LOCK:
+                os.makedirs(os.path.dirname(STATE["results"]), exist_ok=True)
+                open(STATE["results"], "w").close()
+                STATE["active_ids"] = {r["id"] for r in select_run_rows(STATE["rows"], STATE["suggest_split"], None, None)}
+                STATE["benchmark"] = None
+                STATE["benchmark_key"] = None
+                self._send(200, json.dumps({"cleared": True, "results": STATE["results"]}))
+            return
         if self.path.startswith("/api/run"):
             if not STATE["can_run"]:
                 self._send(403, json.dumps({"error": "run disabled (--disable-run)"}))
@@ -292,6 +301,8 @@ def main():
         "last_returncode": None, "last_elapsed": None, "can_run": not a.disable_run,
         "log": os.path.join(HERE, "results", "run.log"),
     })
+    # start scoped to the split the filename suggests, so the dashboard opens at 0/N of the run
+    STATE["active_ids"] = {r["id"] for r in select_run_rows(STATE["rows"], STATE["suggest_split"], None, None)}
     url = f"http://{a.host}:{a.port}/"
     print(f"dashboard: {url}\n  data:    {a.data}\n  results: {a.results} ({'SIMULATED' if STATE['simulated'] else 'live'})\n  run:     {'enabled' if STATE['can_run'] else 'disabled'}")
     if a.open:
