@@ -80,3 +80,73 @@ python3 eval/report.py --results eval/results/test.jsonl
 Watch: **T1 recall**, **T1→T2 confusion**, and **within±1** — those are what the
 discriminator is meant to move. If T1 recall does not improve, the T1/T2
 distinction is not recoverable from a single prompt and should be merged.
+
+---
+
+# Outcome — rubric v2.1 test (2026-09-21)
+
+## The discriminator was rejected
+
+The 5-feature rule (`produces_analysis` included), tuned on dev, scored **68.9%** on
+the blind test vs **72.2%** for the 4-feature rule. The signal is real —
+`produces_analysis` averages 0.51 for T1 vs 0.82 for T2 — but it does not
+generalise. Rubric reverted to **v2.2** (four Nouls, thresholds).
+
+## Two bugs found and fixed
+
+1. **Duplicated mapping logic.** `jev_runner.map_tier` was a stale copy that
+   ignored both `produces_analysis` and the tuner's exported `mapping_model`. The
+   runner therefore executed the **4-feature thresholds (72.5%)** while the report
+   and dashboard scored the tuner's decision tree (**68.4%**). The reported number
+   was not what ran. All three now resolve the tier through
+   `routing.tier_from_nouls` — verified `stored == effective` on all 737 rows.
+2. **`report.py` threshold table** used the stored choice rather than the
+   recomputed tier. Fixed.
+
+Also: the tuner's learned models (logistic regression, decision trees) have now
+overfit dev **twice** and lost to the plain thresholds on test. Thresholds are the
+default; the learned models are behind `--learned`.
+
+## Correct result — business blind test (737 rows)
+
+| predictor | acc | within±1 | macro F1 | T3 recall | cost error | template acc |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Jev v2.2** | **72.5%** | **98.2%** | 0.719 | **87.2%** | **0.412** | **75.6%** |
+| naive Bayes | 72.6% | 95.9% | 0.721 | 84.0% | 0.621 | 65.3% |
+| 1-NN | 65.9% | 94.7% | 0.655 | 79.1% | 0.939 | 62.7% |
+| word count | 49.0% | 94.0% | 0.482 | 58.3% | 1.141 | 52.8% |
+
+Jev ties naive Bayes on raw accuracy, and beats it on cost-weighted error, within±1
+and template accuracy. Still not a decisive win.
+
+## The finding that matters: T1 vs T2 is not separable from a prompt
+
+Collapse T1 and T2 into one class and accuracy jumps:
+
+| granularity | accuracy |
+| --- | --- |
+| four tiers (T0/T1/T2/T3) | 72.5% |
+| **T0 / {T1,T2} / T3** | **85.8%** |
+
+The model reliably distinguishes *local* from *cloud-general* from *frontier*,
+but essentially cannot tell a cheap-hosted task from a flash-frontier one using
+the prompt alone. That is a structural limit of the signal, not a tuning gap —
+we have now tried two question designs and both plateaued at the same place.
+
+## Harness slice (24 test rows — small)
+
+Jev 83.3% / within±1 100% / T3 recall 100% / cost error 0.167. But 1-NN and naive
+Bayes both hit **100%** on this sample, so it is too small to claim transfer.
+
+## Decision to make
+
+Either:
+
+1. **Adopt 3-tier routing** — T0 (local) / T1·T2 (cheapest safe cloud) / T3
+   (frontier). Reliable, simple, and matches what the classifier can actually do.
+   Within the merged tier, route to the model the CIO's policy allows at the
+   lowest cost, accepting that "flash vs cheap-hosted" is not decided by capability.
+2. **Keep 4 tiers** and resolve T1 vs T2 from *richer state* than the prompt —
+   tool calls, repo/turn context, conversation history, attachments — rather than
+   asking one question to guess it.
+

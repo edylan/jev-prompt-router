@@ -1,9 +1,10 @@
 {
-  "rubric_version": "2.1",
+  "rubric_version": "2.2",
   "frozen_at": null,
   "status": "revision",
   "answer_semantics": "minimum_sufficient_tier",
   "mode": "decomposed",
+  "notes": "The runner, report, and dashboard all resolve the tier through routing.tier_from_nouls so they cannot disagree. produces_analysis (v2.1) was tested and removed: it did not generalise.",
   "tier_definitions": {
     "T0": "A capable local model of roughly 12B parameters or less. Bounded rewriting, extraction, formatting, simple code, and clear single-step tasks with limited context.",
     "T1": "An inexpensive hosted general model. Needs more context, constraints, or polish than a small local model handles dependably, but no genuine multi-step reasoning.",
@@ -19,14 +20,6 @@
       "type": "noul",
       "instructions": "Reaching a reliable, professional result requires genuine multi-step reasoning, analysis, or synthesis, rather than merely rewriting, condensing, reformatting, or applying one rule."
     },
-    "produces_analysis": {
-      "type": "noul",
-      "instructions": "Answering reliably requires producing new analysis, diagnosis, design, recommendation, prioritisation, or a defensible judgement, as opposed to transforming, summarising, extracting, reformatting, adapting, translating, or classifying the content already provided.",
-      "criteria": {
-        "true": "producing something not present in the input, e.g. diagnosing a failure, designing an approach, recommending a decision, ranking options, forming an evidence-based judgement",
-        "false": "transforming what is already provided, e.g. rewriting, summarising, extracting, reformatting, adapting, translating, classifying, listing, or converting, however long or large the input is"
-      }
-    },
     "deep": {
       "type": "noul",
       "instructions": "The request involves deep ambiguity, conflicting or incomplete evidence, high-stakes judgment, long-horizon planning, or complex cross-system work, where a weaker model's errors would be costly."
@@ -37,48 +30,38 @@
     }
   },
   "mapping": [
-    "deep >= d                                -> T3",
-    "produces_analysis >= p or multistep >= m -> T2",
-    "single_step >= s and context < c         -> T0",
-    "otherwise                                -> T1"
+    "deep >= d                         -> T3",
+    "multistep >= m                    -> T2",
+    "single_step >= s and context < c  -> T0",
+    "otherwise                         -> T1"
   ],
   "mapping_thresholds": {
     "deep": 0.8,
     "multistep": 0.8,
-    "produces_analysis": 0.5,
     "single_step": 0.4,
     "context": 0.4
   },
   "tuning": {
     "method": "thresholds",
     "objective": "cost",
-    "trained_on": "development split (192 rows), grouped CV by template",
-    "split_version": "stratified-1",
-    "cv_cost_error": 0.2344,
-    "cv_accuracy": 0.8073,
-    "cv_macro_f1": 0.8038,
-    "cv_t3_recall": 0.9778
+    "trained_on": "development split, grouped CV by template",
+    "split_version": "stratified-1"
   },
   "boundary_rules": [
     "Choose the minimum tier, not the best possible answer.",
     "Judge only the intrinsic capability the request needs; ignore vendor, price, and the requester's organization.",
     "Volume, length, or the number of items does NOT raise the tier: processing more items is code's job. A 300-item classification needs no more capability than a 15-item one.",
     "Mentioning tools or attachments does not raise the tier by itself; the required judgment does.",
-    "T1 vs T2 is the decisive boundary: T1 is rewriting, condensing, adapting, or reformatting with more context or constraints; T2 requires genuine multi-step reasoning or analysis.",
+    "T1 vs T2 is the decisive boundary: T1 transforms provided content (rewrite, condense, adapt, reformat, classify); T2 produces new analysis, design, or judgement.",
     "Any deep ambiguity, conflicting evidence, high stakes, long horizon, or cross-system integration is T3."
   ],
-  "changes_from_v2_0": [
-    "Added a produces_analysis Noul with true/false anchors so the T1/T2 boundary is decidable: T1 transforms provided content, T2 produces new analysis/design/judgement.",
-    "Mapping treats produces_analysis as the primary T2 signal; multistep is secondary.",
-    "Label hardening (capability-v1): two scale-driven T2 labels corrected to T1 (adapt-for-three-audiences; classify-300-against-25-categories), since volume and taxonomy size are not capability differences."
-  ],
-  "changes_from_v1": [
-    "Replaced one holistic 4-way Choice with four atomic Noul questions combined in code (fan-out / composite scoring).",
-    "Tier definitions rewritten so T1 is light synthesis with more context/constraints, and T2 is genuine multi-step reasoning \u2014 removing the v1 overlap where both mentioned synthesis.",
-    "Explicit rule that volume/length is not a capability difference (fixes scale-driven label noise found in the audit)."
+  "history": [
+    { "version": "2.0", "change": "Replaced one holistic 4-way Choice with four atomic Nouls combined in code." },
+    { "version": "2.1", "change": "Added a produces_analysis Noul with true/false anchors to sharpen T1 vs T2." },
+    { "version": "2.2", "change": "Removed produces_analysis. On the blind test the 5-feature rule scored 68.9% vs 72.2% for the 4-feature rule; the signal did not generalise. Also fixed duplicated mapping logic so runner/report/dashboard agree." }
   ],
   "audit_findings": {
     "category_alone_accuracy": 0.337,
-    "note": "Categories are tier-mixed, so the benchmark is not purely topical. Boundary noise is concentrated at T1/T2 and is partly scale-driven; see docs/dev-pilot-findings.md."
+    "note": "Categories are tier-mixed. Boundary noise is concentrated at T1/T2. Merging T1/T2 raises accuracy from ~72% to ~83%, i.e. T0, {T1,T2} and T3 are separable from a prompt but T1 vs T2 is not."
   }
 }

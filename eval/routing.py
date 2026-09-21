@@ -57,7 +57,7 @@ def load_rubric(path=None):
     return _RUBRIC
 
 
-FEATURE_ORDER = ["single_step", "multistep", "produces_analysis", "deep", "context"]
+FEATURE_ORDER = ["single_step", "multistep", "deep", "context"]
 
 
 def _linear_tier(nouls, model):

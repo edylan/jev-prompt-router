@@ -20,7 +20,7 @@ import argparse, asyncio, json, os, random, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from routing import load_registry, load_policy, route_row, TIERS  # noqa: E402
+from routing import load_registry, load_policy, route_row, tier_from_nouls, TIERS  # noqa: E402
 
 TIER_DEFS = {
     "T0": "A capable local model of roughly 12B parameters or less. Bounded rewriting, extraction, formatting, simple code, and clear single-step tasks with limited context.",
@@ -48,18 +48,9 @@ if os.path.exists(_RUBRIC_PATH):
 
 
 def map_tier(nouls):
-    """Composite mapping from decomposed Noul answers to a capability tier.
-    Thresholds are recorded in rubric.json so a run is reproducible."""
-    thr = RUBRIC.get("mapping_thresholds", {})
-    d, m = thr.get("deep", 0.5), thr.get("multistep", 0.5)
-    s, c = thr.get("single_step", 0.5), thr.get("context", 0.5)
-    if nouls.get("deep", 0) >= d:
-        return "T3", ["deep"]
-    if nouls.get("multistep", 0) >= m:
-        return "T2", ["multistep"]
-    if nouls.get("single_step", 0) >= s and nouls.get("context", 0) < c:
-        return "T0", ["single_step", "context"]
-    return "T1", ["multistep", "single_step", "context"]
+    """Delegate to routing so the runner, report, and dashboard always use the
+    same mapping (thresholds or an exported model)."""
+    return tier_from_nouls(nouls), list(nouls.keys())
 
 
 def derived_confidence(nouls, deciding):

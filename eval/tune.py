@@ -67,9 +67,9 @@ def make_threshold_rule(thr):
     return rule
 
 
-def candidates(sklearn_ok, thr):
+def candidates(sklearn_ok, thr, learned=False):
     yield ("thresholds", make_threshold_rule(thr), None)
-    if not sklearn_ok:
+    if not (sklearn_ok and learned):
         return
     from sklearn.linear_model import LogisticRegression
     from sklearn.tree import DecisionTreeClassifier
@@ -132,6 +132,7 @@ def main():
     ap.add_argument("--nouls", nargs="+", default=[os.path.join(HERE, "results", "dev-v2.jsonl"), os.path.join(HERE, "results", "test.jsonl")])
     ap.add_argument("--export", action="store_true")
     ap.add_argument("--objective", default="cost", choices=["cost", "accuracy"])
+    ap.add_argument("--learned", action="store_true", help="also try logistic regression / decision trees (they have overfit dev twice)")
     a = ap.parse_args()
 
     rows = load_dataset(a.data)
@@ -158,7 +159,7 @@ def main():
     print(f"\n=== candidates (grouped CV on dev, objective={a.objective}) ===")
     print(f"  {'candidate':30s} {'costErr':>8s} {'acc':>7s} {'macroF1':>8s} {'T3rec':>7s}")
     results = []
-    for name, model, kind in candidates(ok, thr):
+    for name, model, kind in candidates(ok, thr, args.learned):
         cost, acc, f1, t3, _ = cv_score(model, kind, dev, nouls, gold, [groups[i] for i in dev])
         results.append((cost if a.objective == "cost" else -acc, name, model, kind, cost, acc, f1, t3))
         print(f"  {name:30s} {cost:8.3f} {acc:7.1%} {f1:8.3f} {t3:7.1%}")

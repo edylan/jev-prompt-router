@@ -97,7 +97,7 @@ def main():
 
     print("\n=== CONFIDENCE THRESHOLD (trust only conf >= t) ===")
     print(f"  {'t':>5s} {'coverage':>9s} {'acc@t':>7s} {'escalated':>10s}")
-    confs = [(results[i]["jev"].get("confidence") or 0, results[i]["jev"]["choice"] == by_id[i]["gold_tier"]) for i in ok]
+    confs = [(results[i]["jev"].get("confidence") or 0, effective_tier(results[i]) == by_id[i]["gold_tier"]) for i in ok]
     for t in [0.0, 0.5, 0.6, 0.7, 0.8, 0.9]:
         kept = [c for c, _ in confs if c >= t]
         ka = [int(g) for c, g in confs if c >= t]
