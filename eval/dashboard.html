@@ -85,6 +85,11 @@
   .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
   .pill.on{background:#062e1c;border-color:#0f6b3f;color:#4ade80}
   .pill.off{background:#2a0e0e;border-color:#7f1d1d;color:#fca5a5}
+  .nouls{display:grid;gap:2px;min-width:128px}
+  .noul{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim)}
+  .noul .track{flex:1;height:6px;background:#0a0f16;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .noul .fill{height:100%}
+  .noul b{width:26px;text-align:right;color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
@@ -289,8 +294,13 @@ function patchRow(rec){
   const c=j.confidence??0;
   tr.querySelector('.verdict-cell').innerHTML=`${tierChip(j.choice)}<div class="conf" style="margin-top:4px"><div class="track"><div class="fill" style="width:${(c*100).toFixed(0)}%"></div></div><span class="stat">${pct(c)}</span></div>`;
   const pr=j.probabilities||{};
-  const dist=TIERS.map(t=>`<span style="width:${((pr[t]||0)*100).toFixed(1)}%;background:${COLOR[t]}" title="${t} ${pct(pr[t]||0)}"></span>`).join('');
-  tr.querySelector('.dist-cell').innerHTML=`<div class="dist">${dist}</div>`;
+  if(j.nouls){
+    const F=[['single_step','step',COLOR.T0],['multistep','multi',COLOR.T2],['deep','deep',COLOR.T3],['context','ctx',COLOR.T1]];
+    tr.querySelector('.dist-cell').innerHTML='<div class="nouls">'+F.map(([k,lab,col])=>{const v=j.nouls[k]??0;return `<div class="noul" title="${k}=${v}"><span>${lab}</span><div class="track"><div class="fill" style="width:${(v*100).toFixed(0)}%;background:${col}"></div></div><b>${v.toFixed(2)}</b></div>`;}).join('')+'</div>';
+  } else {
+    const dist=TIERS.map(t=>`<span style="width:${((pr[t]||0)*100).toFixed(1)}%;background:${COLOR[t]}" title="${t} ${pct(pr[t]||0)}"></span>`).join('');
+    tr.querySelector('.dist-cell').innerHTML=`<div class="dist">${dist}</div>`;
+  }
   tr.querySelector('.model-cell').innerHTML=rt.chosen_model_display?`${esc(rt.chosen_model_display)} <span class="tag">${esc(rt.cost_band||'')}${rt.escalated_for_confidence?' ·esc':''}</span>`:'—';
   tr.querySelector('.cost-cell').textContent=rt.est_cost_usd!=null?usd(rt.est_cost_usd):'—';
   tr.querySelector('.saved-cell').textContent=rt.saving_usd!=null?usd(rt.saving_usd):'—';
