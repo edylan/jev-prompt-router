@@ -9,7 +9,7 @@ import argparse, collections, json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from baselines import PREDICTORS, metrics, template_accuracy  # noqa: E402
-from routing import load_policy, load_registry, summarize, TIERS, IDX  # noqa: E402
+from routing import load_policy, load_registry, summarize, effective_tier, TIERS, IDX  # noqa: E402
 
 
 def bar(v, width=28, ch="#"):
@@ -40,7 +40,7 @@ def main():
     err = [i for i in ev_ids if (results[i].get("jev") or {}).get("error")]
     ev_rows = [by_id[i] for i in ok]
     gold = [by_id[i]["gold_tier"] for i in ok]
-    pred = [results[i]["jev"]["choice"] for i in ok]
+    pred = [effective_tier(results[i]) for i in ok]
 
     # training split for baselines: the other split by default (template-disjoint from eval)
     eval_splits = {by_id[i]["split"] for i in ok}
@@ -53,15 +53,15 @@ def main():
     q, c, cf = s["quality"], s["cost"], s["confidence"]
 
     print("\n=== JEV vs BASELINES (same rows) ===")
-    print(f"  {'predictor':14s} {'acc':>7s} {'macroF1':>8s} {'T3rec':>7s} {'costErr':>8s} {'tplAcc':>7s}")
+    print(f"  {'predictor':14s} {'acc':>7s} {'w1':>7s} {'macroF1':>8s} {'T3rec':>7s} {'costErr':>8s} {'tplAcc':>7s}")
     jm = metrics(gold, pred)
     jta, jtn = template_accuracy(ev_rows, pred)
-    print(f"  {'JEV':14s} {jm['acc']:7.1%} {jm['macro_f1']:8.3f} {jm['t3_recall']:7.1%} {jm['cost']:8.3f} {jta:7.1%}")
+    print(f"  {'JEV':14s} {jm['acc']:7.1%} {jm['within1']:7.1%} {jm['macro_f1']:8.3f} {jm['t3_recall']:7.1%} {jm['cost']:8.3f} {jta:7.1%}")
     for name, fn in PREDICTORS.items():
         p = fn(train, ev_rows)
         m = metrics(gold, p)
         ta, tn = template_accuracy(ev_rows, p)
-        print(f"  {name:14s} {m['acc']:7.1%} {m['macro_f1']:8.3f} {m['t3_recall']:7.1%} {m['cost']:8.3f} {ta:7.1%}")
+        print(f"  {name:14s} {m['acc']:7.1%} {m['within1']:7.1%} {m['macro_f1']:8.3f} {m['t3_recall']:7.1%} {m['cost']:8.3f} {ta:7.1%}")
     print(f"  ({jtn} templates)")
 
     print("\n=== PER-TIER ===")

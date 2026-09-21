@@ -57,11 +57,38 @@ def load_rubric(path=None):
     return _RUBRIC
 
 
+FEATURE_ORDER = ["single_step", "multistep", "deep", "context"]
+
+
+def _linear_tier(nouls, model):
+    x = [float(nouls.get(f, 0.0)) for f in model.get("features", FEATURE_ORDER)]
+    scores = [sum(c * xi for c, xi in zip(coef, x)) + b for coef, b in zip(model["coef"], model["intercept"])]
+    return model["classes"][max(range(len(scores)), key=lambda i: scores[i])]
+
+
+def _tree_tier(nouls, model):
+    node = model["tree"]
+    while "leaf" not in node:
+        v = float(nouls.get(node["feature"], 0.0))
+        node = node["left"] if v <= node["threshold"] else node["right"]
+    return node["leaf"]
+
+
 def tier_from_nouls(nouls, rubric=None):
-    """Decomposed rubric: Noul values -> tier, using the recorded thresholds."""
+    """Decomposed rubric: Noul values -> tier. Uses a learned mapping_model when
+    present (fitted by eval/tune.py), otherwise the hand thresholds."""
     r = rubric or load_rubric()
     if r.get("mode") != "decomposed":
         return None
+    mm = r.get("mapping_model")
+    if mm:
+        try:
+            if mm.get("type") == "linear":
+                return _linear_tier(nouls, mm)
+            if mm.get("type") == "tree":
+                return _tree_tier(nouls, mm)
+        except Exception:  # noqa: BLE001 - fall back to thresholds
+            pass
     thr = r.get("mapping_thresholds", {})
     d, m = thr.get("deep", 0.5), thr.get("multistep", 0.5)
     s, c = thr.get("single_step", 0.5), thr.get("context", 0.5)

@@ -152,12 +152,8 @@ for (const bank of [bankNew, bankNew2]) {
     for (const tier of TIERS) (bank[category]?.[tier] ?? []).forEach((t) => addTemplate(category, tier, 'new', t));
   }
 }
-// stratified split at the template level: every 5th template in a (category,tier) bucket -> dev
-const bucketIndex = {};
+// compute variants first, then split so dev/test have matching tier proportions
 for (const t of templates) {
-  const b = `${t.category}|${t.tier}`;
-  bucketIndex[b] = (bucketIndex[b] ?? -1) + 1;
-  t.split = bucketIndex[b] % 5 === 0 ? 'development' : 'test';
   t.variants = (() => {
     const out = []; const seen = new Set();
     const hasSlots = /\{\w+\}/.test(t.template);
@@ -168,6 +164,22 @@ for (const t of templates) {
     }
     return out;
   })();
+}
+// stratified split at the template level: within each (category,tier) bucket put ~20% of that
+// bucket's ROWS into dev, so dev and test share the same tier mix (the v2 split did not).
+const bucket = {};
+for (const t of templates) (bucket[`${t.category}|${t.tier}`] ??= []).push(t);
+for (const key of Object.keys(bucket)) {
+  const list = bucket[key].sort((a, b) => (a.key < b.key ? -1 : 1));
+  const total = list.reduce((s, t) => s + t.variants.length, 0);
+  const target = list.length > 1 ? Math.max(1, Math.round(0.2 * total)) : 0;
+  let devRows = 0, devCount = 0;
+  for (const t of list) {
+    const canSplit = list.length - devCount > 1;
+    if (canSplit && devRows + t.variants.length <= target) { t.split = 'development'; devRows += t.variants.length; devCount += 1; }
+    else t.split = 'test';
+  }
+  if (devCount === 0 && list.length > 1) list[0].split = 'development';
 }
 
 // ---------------------------------------------------------------- balanced allocation
@@ -285,6 +297,7 @@ const manifest = {
   generated_at: new Date().toISOString().slice(0, 10),
   seed: `0x${SEED.toString(16)}`,
   rubric_version: 'v2',
+  split_version: 'stratified-1',
   counts: {
     business: business.length, harness: harness.length, total: all.length,
     business_templates: businessTemplates.size,
@@ -299,6 +312,8 @@ const manifest = {
     dev_templates: devT.size, test_templates: testT.size,
     duplicate_canonical_prompts: dupCores,
     harness_scenarios_spanning_split: 0,
+    dev_tier_share: Object.fromEntries(TIERS.map((t) => [t, +(business.filter((r) => r.split === 'development' && r.gold_tier === t).length / Math.max(1, business.filter((r) => r.split === 'development').length)).toFixed(3)])),
+    test_tier_share: Object.fromEntries(TIERS.map((t) => [t, +(business.filter((r) => r.split === 'test' && r.gold_tier === t).length / Math.max(1, business.filter((r) => r.split === 'test').length)).toFixed(3)])),
   },
   independence: {
     note: 'Governance and ambient fields are deliberately drawn independently of gold_tier. Cramers V near 0 = independent.',

@@ -3,6 +3,7 @@
   "generated_at": "2026-09-21",
   "seed": "0x5eed2026",
   "rubric_version": "v2",
+  "split_version": "stratified-1",
   "counts": {
     "business": 928,
     "harness": 72,
@@ -16,8 +17,8 @@
       "T3": 250
     },
     "by_split": {
-      "development": 303,
-      "test": 697
+      "development": 216,
+      "test": 784
     },
     "business_by_tier": {
       "T0": 232,
@@ -26,8 +27,8 @@
       "T3": 232
     },
     "business_by_split": {
-      "development": 279,
-      "test": 649
+      "development": 192,
+      "test": 736
     },
     "business_by_category": {
       "business_strategy": 78,
@@ -75,10 +76,22 @@
   },
   "integrity": {
     "templates_spanning_split": 0,
-    "dev_templates": 88,
-    "test_templates": 247,
+    "dev_templates": 143,
+    "test_templates": 192,
     "duplicate_canonical_prompts": 0,
-    "harness_scenarios_spanning_split": 0
+    "harness_scenarios_spanning_split": 0,
+    "dev_tier_share": {
+      "T0": 0.271,
+      "T1": 0.26,
+      "T2": 0.234,
+      "T3": 0.234
+    },
+    "test_tier_share": {
+      "T0": 0.245,
+      "T1": 0.247,
+      "T2": 0.254,
+      "T3": 0.254
+    }
   },
   "independence": {
     "note": "Governance and ambient fields are deliberately drawn independently of gold_tier. Cramers V near 0 = independent.",

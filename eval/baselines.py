@@ -19,6 +19,7 @@ import argparse, collections, itertools, json, math, random
 
 TIERS = ["T0", "T1", "T2", "T3"]
 IDX = {t: i for i, t in enumerate(TIERS)}
+IDX = {t: i for i, t in enumerate(TIERS)}
 
 
 def load(path, text_field="prompt"):
@@ -118,7 +119,8 @@ def metrics(gold, pred):
         f1s.append(2 * prec * rec / (prec + rec) if prec + rec else 0.0)
     macro_f1 = sum(f1s) / len(f1s)
     mean_cost = sum(cost(g, p) for g, p in zip(gold, pred)) / n
-    return {"acc": acc, "macro_f1": macro_f1, "t3_recall": recall["T3"], "cost": mean_cost}
+    within1 = sum(abs(IDX[g] - IDX[p]) <= 1 for g, p in zip(gold, pred)) / n
+    return {"acc": acc, "macro_f1": macro_f1, "t3_recall": recall["T3"], "cost": mean_cost, "within1": within1}
 
 
 def template_accuracy(rows, pred):

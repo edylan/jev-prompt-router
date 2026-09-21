@@ -121,6 +121,9 @@ and what it costs, is decided here in code.
 | `jev_runner.py` | calls Jev, writes results incrementally |
 | `rubric.json` | frozen rubric v1.0 — question, criteria, boundary rules |
 | `baselines.py` | majority / word-count / 1-NN / naive Bayes |
+| `report.py` | full run report: Jev vs baselines, confusion, calibration, errors |
+| `tune.py` | offline mapping tuner (uses cached Nouls; no API calls) |
+| `audit_labels.py` | label/topical-confound audit |
 | `routing.py` | shared policy, model selection, cost, and summary logic |
 | `simulate_results.py` | writes clearly-marked simulated results for demos |
 | `dashboard_server.py` | stdlib server for the live dashboard |

@@ -34,13 +34,21 @@
     "single_step >= s and context < c -> T0",
     "otherwise            -> T1"
   ],
-  "mapping_thresholds": { "deep": 0.8, "multistep": 0.8, "single_step": 0.4, "context": 0.4 },
+  "mapping_thresholds": {
+    "deep": 0.8,
+    "multistep": 0.8,
+    "single_step": 0.4,
+    "context": 0.4
+  },
   "tuning": {
-    "tuned_on": "development split (279 rows), template-level 5-fold CV",
-    "cv_accuracy": 0.830,
-    "cv_t3_recall": 0.969,
-    "cv_cost_error": 0.234,
-    "note": "Thresholds chosen to maximize accuracy subject to T3 recall >= 0.95 on held-out folds. Noul values are stored per result, so re-tuning costs no API calls. Thresholds are stable across folds (deep 0.7-0.8, multistep 0.8, single_step 0.4)."
+    "method": "thresholds",
+    "objective": "cost",
+    "trained_on": "development split (192 rows), grouped CV by template",
+    "split_version": "stratified-1",
+    "cv_cost_error": 0.2344,
+    "cv_accuracy": 0.8073,
+    "cv_macro_f1": 0.8038,
+    "cv_t3_recall": 0.9778
   },
   "boundary_rules": [
     "Choose the minimum tier, not the best possible answer.",
@@ -52,7 +60,7 @@
   ],
   "changes_from_v1": [
     "Replaced one holistic 4-way Choice with four atomic Noul questions combined in code (fan-out / composite scoring).",
-    "Tier definitions rewritten so T1 is light synthesis with more context/constraints, and T2 is genuine multi-step reasoning — removing the v1 overlap where both mentioned synthesis.",
+    "Tier definitions rewritten so T1 is light synthesis with more context/constraints, and T2 is genuine multi-step reasoning \u2014 removing the v1 overlap where both mentioned synthesis.",
     "Explicit rule that volume/length is not a capability difference (fixes scale-driven label noise found in the audit)."
   ],
   "audit_findings": {
