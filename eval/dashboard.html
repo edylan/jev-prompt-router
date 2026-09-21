@@ -159,6 +159,7 @@
 
   <div class="grid cards" id="cards"></div>
   <p class="note" id="headline"></p>
+  <p class="note" id="tier3"></p>
   <p class="note" id="caveat"></p>
 
   <div class="grid panels" style="margin-top:14px">
@@ -382,6 +383,11 @@ function paintSummary(){
   if(c.savings_pct!=null){
     $('#headline').innerHTML=`Routing <b>${q.n}</b> prompts to the cheapest eligible model is projected to cut inference spend from <b>${usd(c.baseline_usd)}</b> to <b>${usd(c.routed_usd)}</b> (−${pct(c.savings_pct)}), versus the named baseline, a net saving of <b>${usd(c.net_savings_usd)}</b> after <b>${usd(c.classification_usd)}</b> of Jev classification. Oracle (perfect routing) would be <b>${usd(c.oracle_routed_usd)}</b>.`;
   }
+  const t3c=c.three_tier;
+  if(t3c){
+    const band=Object.entries(t3c.band).map(([f,v])=>`${pct(parseFloat(f))}→<b>${pct(v.savings_pct)}</b>`).join(' · ');
+    $('#tier3').innerHTML=`<b>3-tier routing</b> (local | cloud-general | frontier): accuracy <b>${q.accuracy_3tier!=null?pct(q.accuracy_3tier):'—'}</b> vs ${usd(t3c.baseline_usd)} all-frontier baseline — savings, as the share of the merged middle tier sent to frontier-class models varies: ${band}. <span class="stat">T1/T2 are not separable from a prompt, so this range is modelled, not predicted.</span>`;
+  }
   const gold=S.mix.gold_tiers||{},jev=S.mix.jev_tiers||{};
   const tot=(o)=>Object.values(o).reduce((a,b)=>a+b,0);
   const bar=(obj,T)=>TIERS.map(t=>{const w=T?100*(obj[t]||0)/T:0;return w?`<span style="width:${w}%;background:${COLOR[t]}" title="${t}: ${obj[t]||0}">${w>7?(obj[t]||0):''}</span>`:'';}).join('');
@@ -408,6 +414,7 @@ function renderBenchmark(){
   const jt={acc:q.accuracy,macro_f1:q.macro_f1,t3_recall:q.t3_recall,cost:q.cost_weighted_mean};
   $('#bmScore').innerHTML=[
     ['Accuracy',jt.acc!=null?pct(jt.acc):'—'],
+    ['Accuracy T0|T1+T2|T3',q.accuracy_3tier!=null?pct(q.accuracy_3tier):'—'],
     ['Macro F1',jt.macro_f1!=null?jt.macro_f1.toFixed(3):'—'],
     ['T3 recall (frontier)',jt.t3_recall!=null?pct(jt.t3_recall):'—'],
     ['Cost-weighted error',jt.cost!=null?jt.cost.toFixed(3):'—'],

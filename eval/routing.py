@@ -212,6 +212,53 @@ def _per_tier(gold, pred):
     return out
 
 
+# ---------------------------------------------------------------- 3-tier routing model
+# T1 and T2 are not separable from a prompt (see docs/label-improvements.md), so the
+# router collapses them into T12 and models the middle tier as a *mixture*: a share
+# `f` of T12 work is served by cheap frontier-class models (T3, cost band C1), the
+# rest by standard cloud. `f` is a policy assumption (default 0.65), reported as a
+# 0.50-0.75 band, not a Jev prediction.
+ROUTING_TIERS = ["T0", "T12", "T3"]
+
+
+def routing_tier(tier):
+    if tier == "T0":
+        return "T0"
+    if tier == "T3":
+        return "T3"
+    return "T12"
+
+
+def expected_cost_3tier(req_tier, gov, in_tokens, policy, models, f):
+    """Expected routed cost for one prompt under the 3-tier mixture model."""
+    ot = policy.get("output_tokens_by_routing_tier", {"T0": 300, "T12": 700, "T3": 1600})
+    t = routing_tier(req_tier)
+
+    def c(m, key):
+        return model_cost(m, in_tokens, ot.get(key, 700))
+
+    def cheapest(pred, key):
+        cands = [m for m in models if pred(m) and is_eligible(m, gov, policy)]
+        return min(cands, key=lambda m: c(m, key)) if cands else None
+
+    if t == "T0":
+        m = cheapest(lambda m: m["capability_tier"] == "T0", "T0")
+        return c(m, "T0") if m else None
+    if t == "T3":
+        m = cheapest(lambda m: m["capability_tier"] == "T3", "T3")
+        return c(m, "T3") if m else None
+    # T12 is served by at least flash-frontier (T2); the substitution share `f` goes to
+    # the cheapest frontier-class model (T3) instead. We never route the uncertain middle
+    # tier to T1 models, since we cannot tell T1 from T2.
+    std = cheapest(lambda m: m["capability_tier"] == "T2", "T12")
+    cf = cheapest(lambda m: m["capability_tier"] == "T3", "T12")
+    if cf is None:
+        return c(std, "T12") if std else None
+    if std is None:
+        return c(cf, "T12")
+    return f * c(cf, "T12") + (1 - f) * c(std, "T12")
+
+
 def summarize(rows, results, policy, models, limit=None):
     """rows: dataset rows; results: {id: result}. Missing ids are pending."""
     by_id = {r["id"]: r for r in rows}
@@ -233,8 +280,12 @@ def summarize(rows, results, policy, models, limit=None):
         for g, p in zip(gold, pred):
             if p in confusion.get(g, {}):
                 confusion[g][p] += 1
+        def _m3(t):
+            return "T0" if t == "T0" else ("T3" if t == "T3" else "T12")
+        acc3 = sum(1 for g, p in zip(gold, pred) if p is not None and _m3(g) == _m3(p)) / n
         quality.update({
             "accuracy": acc, "macro_f1": macro_f1,
+            "accuracy_3tier": acc3,
             "t3_recall": per_tier["T3"]["recall"],
             "cost_weighted_mean": sum(cost_weight(g, p) for g, p in zip(gold, pred)) / n,
             "per_tier": per_tier, "confusion": confusion,
@@ -281,6 +332,28 @@ def summarize(rows, results, policy, models, limit=None):
             "avg_routed_usd": routed / len(routes), "avg_baseline_usd": baseline / len(routes),
             "escalated": sum(1 for r in routes if r["escalated_for_confidence"] or r["escalated_for_policy"]),
         })
+
+    # 3-tier mixture model. T1/T2 are not separable from a prompt, so the middle tier is
+    # priced as a mixture of cheap frontier-class (T3,C1) and standard cloud, over a band
+    # of substitution rates. This is an assumption, not a Jev prediction.
+    f_default = policy.get("cheap_frontier_substitution", 0.65)
+    baseline_model = next((m for m in models if m["id"] == policy.get("baseline_model_id")), None)
+    ot3 = policy.get("output_tokens_by_routing_tier", {"T0": 300, "T12": 700, "T3": 1600})
+    tiers_ok = [(by_id[x["id"]], effective_tier(x)) for x in ok]
+    tiers_ok = [(r, t) for r, t in tiers_ok if t in IDX]
+    if tiers_ok and baseline_model:
+        base3 = sum(model_cost(baseline_model, estimate_tokens(r["prompt"]), ot3.get(routing_tier(t), 700)) for r, t in tiers_ok)
+
+        def _routed(f):
+            return sum((expected_cost_3tier(t, r.get("governance"), estimate_tokens(r["prompt"]), policy, models, f) or 0.0) for r, t in tiers_ok)
+        three = {"n": len(tiers_ok), "f_default": f_default, "baseline_usd": base3, "band": {}}
+        for f in (0.50, 0.65, 0.75):
+            rc = _routed(f)
+            three["band"][f"{f:.2f}"] = {"routed_usd": rc, "savings_usd": base3 - rc, "savings_pct": (1 - rc / base3) if base3 else 0.0}
+        for label, f in (("all_standard", 0.0), ("all_cheap_frontier", 1.0)):
+            rc = _routed(f)
+            three[label] = {"routed_usd": rc, "savings_pct": (1 - rc / base3) if base3 else 0.0}
+        cost["three_tier"] = three
 
     mix = {
         "gold_tiers": dict(collections.Counter(by_id[x["id"]]["gold_tier"] for x in ok)),

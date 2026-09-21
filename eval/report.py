@@ -108,6 +108,15 @@ def main():
     print(f"  routed ${c.get('routed_usd',0):.3f} vs baseline ${c.get('baseline_usd',0):.3f}  (saved {100*c.get('savings_pct',0):.1f}%)")
     print(f"  latency p50 {s['latency'].get('p50_ms')} ms  p95 {s['latency'].get('p95_ms')} ms")
 
+    t3 = c.get("three_tier")
+    if t3:
+        print("\n=== 3-TIER ROUTING (T0 | T1+T2 | T3) ===")
+        print(f"  3-tier accuracy {q.get('accuracy_3tier', 0):.1%}  (vs 4-tier {q.get('accuracy', 0):.1%})")
+        print(f"  baseline all-frontier ${t3['baseline_usd']:.3f} over {t3['n']} prompts")
+        for f, v in t3["band"].items():
+            print(f"    middle tier -> frontier-class {f}: routed ${v['routed_usd']:.3f}  savings {v['savings_pct']:.1%}")
+        print(f"    all-standard(T2) ${t3['all_standard']['routed_usd']:.3f} ({t3['all_standard']['savings_pct']:.1%})  |  all-frontier-class ${t3['all_cheap_frontier']['routed_usd']:.3f} ({t3['all_cheap_frontier']['savings_pct']:.1%})")
+
     wrong = [(i, by_id[i], results[i]) for i in ok if results[i]["jev"]["choice"] != by_id[i]["gold_tier"]]
     under = [w for w in wrong if IDX[w[2]["jev"]["choice"]] < IDX[w[1]["gold_tier"]]]
     over = [w for w in wrong if IDX[w[2]["jev"]["choice"]] > IDX[w[1]["gold_tier"]]]
