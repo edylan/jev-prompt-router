@@ -198,6 +198,8 @@ async function poll(){
       ROWS=s.rows;ROWS.forEach(r=>rowData.set(r.id,r));buildTable();booted=true;
       $('#mode').textContent=s.meta.simulated?'SIMULATED':'LIVE';
       $('#mode').className='badge '+(s.meta.simulated?'sim':'live');
+      if(s.meta.suggest_mode)$('#runMode').value=s.meta.suggest_mode;
+      if(s.meta.suggest_split)$('#runSplit').value=s.meta.suggest_split;
       populateBaselines();
     }
     RESULTS=s.results;SUMMARY=s.summary;POLICY=s.policy||{};MODELS=s.models||[];RUN=s.run||{};LOG=s.log||'';PRICING=s.pricing||{};

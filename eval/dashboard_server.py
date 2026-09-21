@@ -158,7 +158,8 @@ class Handler(BaseHTTPRequestHandler):
                     "log": log_tail(),
                     "meta": {"generated_at": STATE["generated_at"], "results_path": STATE["results"],
                              "simulated": STATE["simulated"], "policy_sig": policy_sig(policy),
-                             "can_run": STATE["can_run"]},
+                             "can_run": STATE["can_run"], "suggest_mode": STATE["suggest_mode"],
+                             "suggest_split": STATE["suggest_split"]},
                 }, default=str))
         elif self.path.startswith("/api/log"):
             self._send(200, json.dumps({"log": log_tail(200)}))
@@ -247,10 +248,13 @@ def main():
 
     policy_path = a.policy or os.path.join(HERE, "policy.json")
     registry_doc = load_registry_doc(a.registry)
+    base = os.path.basename(a.results).lower()
     STATE.update({
         "rows": load_rows(a.data), "data": a.data, "results": a.results,
         "policy": load_policy(policy_path), "policy_path": policy_path,
         "models": registry_doc["models"], "registry_doc": registry_doc, "generated_at": "2026-09-21",
+        "suggest_mode": "sim" if ("sim" in base or "rehearsal" in base or "demo" in base) else "real",
+        "suggest_split": "test" if "test" in base else "development",
         "simulated": "sim" in os.path.basename(a.results),
         "proc": None, "mode": None, "run_opts": None, "started_at": None,
         "active_ids": None,
