@@ -86,6 +86,27 @@ def select_run_rows(rows, split, slice_, limit):
     return r[:limit] if limit else r
 
 
+def compute_benchmark(active_rows, all_rows):
+    """Baselines trained on the other split, scored on the active rows. Cached."""
+    try:
+        from baselines import PREDICTORS, metrics
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+    eval_splits = {r["split"] for r in active_rows}
+    train_split = "test" if eval_splits == {"development"} else "development"
+    train = [{"gold_tier": r["gold_tier"], "_text": r["prompt"]} for r in all_rows if r["split"] == train_split]
+    ev = [{"gold_tier": r["gold_tier"], "_text": r["prompt"]} for r in active_rows]
+    gold = [r["gold_tier"] for r in ev]
+    predictors = {}
+    for name, fn in PREDICTORS.items():
+        try:
+            m = metrics(gold, fn(train, ev))
+            predictors[name] = {"acc": m["acc"], "macro_f1": m["macro_f1"], "t3_recall": m["t3_recall"], "cost": m["cost"]}
+        except Exception as e:  # noqa: BLE001
+            predictors[name] = {"error": str(e)}
+    return {"train_split": train_split, "n_train": len(train), "n_eval": len(ev), "predictors": predictors}
+
+
 def build_cmd(o):
     results = STATE["results"]
     if o.get("reset"):
@@ -150,8 +171,17 @@ class Handler(BaseHTTPRequestHandler):
                     light[k] = lite
                 summary = summarize(rows, results, policy, models)
                 sim = any(rec.get("simulated") for rec in results.values()) if results else STATE["simulated"]
+                bench = None
+                if active:
+                    import hashlib as _h
+                    bkey = _h.sha1(",".join(sorted(active)).encode()).hexdigest()[:12]
+                    if STATE.get("benchmark_key") != bkey:
+                        STATE["benchmark"] = compute_benchmark(rows, STATE["rows"])
+                        STATE["benchmark_key"] = bkey
+                    bench = STATE["benchmark"]
                 self._send(200, json.dumps({
                     "rows": rows, "results": light, "summary": summary,
+                    "benchmark": bench,
                     "policy": policy,
                     "models": [{"id": m["id"], "display": m["display"], "capability_tier": m["capability_tier"], "cost_band": m["cost_band"], "origin": m["origin"], "vendor": m["vendor"], "serving_locus": m["serving_locus"], "input_usd_per_mtok": m["input_usd_per_mtok"], "output_usd_per_mtok": m["output_usd_per_mtok"]} for m in models],
                     "pricing": {"source": STATE["registry_doc"].get("pricing_source"), "fetched_at": STATE["registry_doc"].get("pricing_fetched_at"), "note": STATE["registry_doc"].get("note")},
@@ -258,7 +288,7 @@ def main():
         "suggest_split": "test" if "test" in base else "development",
         "simulated": "sim" in os.path.basename(a.results),
         "proc": None, "mode": None, "run_opts": None, "started_at": None,
-        "active_ids": None,
+        "active_ids": None, "benchmark": None, "benchmark_key": None,
         "last_returncode": None, "last_elapsed": None, "can_run": not a.disable_run,
         "log": os.path.join(HERE, "results", "run.log"),
     })

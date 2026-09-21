@@ -90,6 +90,23 @@
   .noul .track{flex:1;height:6px;background:#0a0f16;border:1px solid var(--line);border-radius:999px;overflow:hidden}
   .noul .fill{height:100%}
   .noul b{width:26px;text-align:right;color:var(--text);font-weight:600}
+  .bmgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .bmstat{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:3px 0;font-size:12px}
+  .bmstat b{font-variant-numeric:tabular-nums}
+  .bmtab{width:100%;border-collapse:collapse;font-size:12px}
+  .bmtab th,.bmtab td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
+  .bmtab th:first-child,.bmtab td:first-child{text-align:left}
+  .bmtab th{position:static;background:transparent;text-transform:none;letter-spacing:0}
+  .bmtab tr.hl{background:#16233a}
+  .bmtab.heat td{text-align:center;font-variant-numeric:tabular-nums}
+  .calrow{display:flex;align-items:center;gap:6px;font-size:11px;margin:2px 0}
+  .calrow>span:first-child{width:24px;color:var(--dim)}
+  .caltrack{flex:1;height:10px;background:#0a0f16;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .calfill{height:100%;background:#1f6feb}
+  .calrow .stat{width:96px;text-align:right}
+  .errrow{padding:3px 6px;border-bottom:1px solid var(--line);font-size:12px;cursor:pointer}
+  .errrow:hover{background:#141c27}
+  .prompt-inline{color:var(--dim);font-family:var(--mono);font-size:11px}
 </style>
 </head>
 <body>
@@ -157,6 +174,23 @@
 
   <div class="panel" style="margin-top:14px"><h3>Per business function</h3><div id="functable"></div></div>
 
+  <div class="panel" id="benchmarkPanel" style="margin-top:14px;display:none">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Benchmark evaluation <span class="stat">— offline, requires gold labels (not available in production)</span></h3>
+      <button id="bmToggle" style="padding:3px 10px">hide</button>
+    </div>
+    <div id="benchmarkBody">
+      <div class="bmgrid" style="margin-top:10px">
+        <div><h4 style="margin:6px 0;font-size:11px;color:var(--dim)">Scorecard</h4><div id="bmScore"></div></div>
+        <div><h4 style="margin:6px 0;font-size:11px;color:var(--dim)">Baselines (trained on <span id="bmTrain">—</span>)</h4><div id="bmBase"></div></div>
+        <div><h4 style="margin:6px 0;font-size:11px;color:var(--dim)">Confusion — gold × Jev</h4><div id="bmConf"></div></div>
+        <div><h4 style="margin:6px 0;font-size:11px;color:var(--dim)">Calibration</h4><div id="bmCal"></div><p class="note" id="bmEce"></p></div>
+      </div>
+      <div style="margin-top:12px"><h4 style="margin:6px 0;font-size:11px;color:var(--dim)">Escalation threshold — accuracy vs frontier recall</h4><div id="bmCurve"></div></div>
+      <div style="margin-top:12px"><h4 style="margin:6px 0;font-size:11px;color:var(--dim)">Errors <span class="stat" id="bmErrCount"></span></h4><div id="bmErrors"></div></div>
+    </div>
+  </div>
+
   <div class="panel" style="margin-top:14px">
     <h3>Prompt inbox <span class="stat" id="inboxcount"></span></h3>
     <div class="toolbar">
@@ -184,7 +218,7 @@
 const TIERS=['T0','T1','T2','T3'];
 const CLS={T0:'t0',T1:'t1',T2:'t2',T3:'t3'};
 const COLOR={T0:'#22c55e',T1:'#38bdf8',T2:'#f59e0b',T3:'#ef4444'};
-let ROWS=[],RESULTS={},SUMMARY=null,POLICY={},MODELS=[],RUN={},LOG='',PRICING={},rowEls=new Map(),rowData=new Map(),patched=new Set(),booted=false,lastSig=null,basePop=false;
+let ROWS=[],RESULTS={},SUMMARY=null,POLICY={},MODELS=[],RUN={},LOG='',PRICING={},BENCH={},rowEls=new Map(),rowData=new Map(),patched=new Set(),booted=false,lastSig=null,basePop=false;
 const $=(s)=>document.querySelector(s);
 const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=(v)=>{v=v||0; if(v===0)return '$0'; if(Math.abs(v)<0.01)return '$'+v.toFixed(4); if(Math.abs(v)<1)return '$'+v.toFixed(3); return '$'+v.toFixed(2);};
@@ -194,7 +228,7 @@ const post=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'applica
 async function poll(){
   try{
     const s=await (await fetch('/api/state',{cache:'no-store'})).json();
-    RESULTS=s.results;SUMMARY=s.summary;POLICY=s.policy||{};MODELS=s.models||[];RUN=s.run||{};LOG=s.log||'';PRICING=s.pricing||{};
+    RESULTS=s.results;SUMMARY=s.summary;POLICY=s.policy||{};MODELS=s.models||[];RUN=s.run||{};LOG=s.log||'';PRICING=s.pricing||{};BENCH=s.benchmark||{};
     if(!booted){
       ROWS=s.rows;ROWS.forEach(r=>rowData.set(r.id,r));buildTable();booted=true;
       $('#mode').textContent=s.meta.simulated?'SIMULATED':'LIVE';
@@ -206,7 +240,7 @@ async function poll(){
     if(s.meta.policy_sig!==lastSig){ lastSig=s.meta.policy_sig; syncControls(); patched.clear(); }
     renderBaseline();
     if(s.meta.can_run===false){ $('#btnStart').disabled=true; $('#runHint').textContent='run disabled (server --disable-run)'; }
-    paintSummary();patchNew();renderRun();
+    paintSummary();patchNew();renderRun();renderBenchmark();
   }catch(e){/* server restarting */}
   setTimeout(poll,900);
 }
@@ -362,6 +396,55 @@ function paintSummary(){
   $('#functable').innerHTML=`<table class="functable"><thead><tr><th>function</th><th>n</th><th>accuracy</th><th>routed</th><th>baseline</th><th>saved</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function renderBenchmark(){
+  const panel=$('#benchmarkPanel');
+  const hasGold=ROWS.length&&ROWS[0]&&ROWS[0].gold_tier;
+  const ev=ROWS.filter(r=>RESULTS[r.id]&&RESULTS[r.id].jev&&!RESULTS[r.id].jev.error);
+  if(!hasGold||!ev.length||!SUMMARY||!SUMMARY.quality){panel.style.display='none';return;}
+  panel.style.display='';
+  const q=SUMMARY.quality,c=SUMMARY.cost||{};
+  const jt={acc:q.accuracy,macro_f1:q.macro_f1,t3_recall:q.t3_recall,cost:q.cost_weighted_mean};
+  $('#bmScore').innerHTML=[
+    ['Accuracy',jt.acc!=null?pct(jt.acc):'—'],
+    ['Macro F1',jt.macro_f1!=null?jt.macro_f1.toFixed(3):'—'],
+    ['T3 recall (frontier)',jt.t3_recall!=null?pct(jt.t3_recall):'—'],
+    ['Cost-weighted error',jt.cost!=null?jt.cost.toFixed(3):'—'],
+    ['Escalated by policy',c.escalated!=null?c.escalated:'—'],
+    ['Evaluated',ev.length],
+  ].map(([k,v])=>`<div class="bmstat"><span>${k}</span><b>${v}</b></div>`).join('');
+  const P=(BENCH&&BENCH.predictors)||{};
+  $('#bmTrain').textContent=(BENCH&&BENCH.train_split)?`${BENCH.train_split} · ${BENCH.n_train} rows`:'—';
+  let th='<table class="bmtab"><thead><tr><th>predictor</th><th>acc</th><th>macroF1</th><th>T3rec</th><th>costErr</th></tr></thead><tbody>';
+  th+=`<tr class="hl"><td>Jev (v2)</td><td>${jt.acc!=null?pct(jt.acc):'—'}</td><td>${jt.macro_f1!=null?jt.macro_f1.toFixed(3):'—'}</td><td>${jt.t3_recall!=null?pct(jt.t3_recall):'—'}</td><td>${jt.cost!=null?jt.cost.toFixed(3):'—'}</td></tr>`;
+  for(const [k,v] of Object.entries(P)){if(v.error)continue;th+=`<tr><td>${esc(k)}</td><td>${pct(v.acc)}</td><td>${v.macro_f1.toFixed(3)}</td><td>${pct(v.t3_recall)}</td><td>${v.cost.toFixed(3)}</td></tr>`;}
+  $('#bmBase').innerHTML=th+'</tbody></table>';
+  const conf=q.confusion||{};let maxc=1;TIERS.forEach(g=>TIERS.forEach(p=>maxc=Math.max(maxc,(conf[g]&&conf[g][p])||0)));
+  let h='<table class="bmtab heat"><thead><tr><th></th>'+TIERS.map(t=>`<th>${t}</th>`).join('')+'</tr></thead><tbody>';
+  TIERS.forEach(g=>{h+=`<tr><th>${g}</th>`+TIERS.map(p=>{const v=(conf[g]&&conf[g][p])||0;const a=v/maxc;const bad=(g!==p&&v>0);return `<td style="background:rgba(124,156,255,${(0.06+0.7*a).toFixed(2)});${bad?'color:#ffb4b4;font-weight:700':''}">${v}</td>`;}).join('')+'</tr>';});
+  $('#bmConf').innerHTML=h+'</tbody></table>';
+  const bins=Array.from({length:10},()=>({n:0,c:0}));
+  ev.forEach(r=>{const cc=RESULTS[r.id].jev.confidence??0;const b=Math.min(9,Math.floor(cc*10));bins[b].n++;if(RESULTS[r.id].correct)bins[b].c++;});
+  let ece=0;const N=ev.length;
+  bins.forEach((b,i)=>{if(b.n){ece+=(b.n/N)*Math.abs(b.c/b.n-(i+0.5)/10);}});
+  $('#bmCal').innerHTML=bins.map((b,i)=>{const a=b.n?b.c/b.n:0;return `<div class="calrow"><span>${(i/10).toFixed(1)}</span><div class="caltrack"><div class="calfill" style="width:${(a*100).toFixed(0)}%"></div></div><span class="stat">${b.n?pct(a):'—'} n=${b.n}</span></div>`;}).join('');
+  $('#bmEce').textContent=`ECE ${ece.toFixed(3)} · mean confidence ${(SUMMARY.confidence&&SUMMARY.confidence.mean!=null)?SUMMARY.confidence.mean.toFixed(3):'—'}`;
+  const thr=(POLICY.escalate_below_confidence??0.6);
+  let cur='<table class="bmtab"><thead><tr><th>escalate below t</th><th>trusted (conf≥t)</th><th>accuracy</th><th>T3 recall</th></tr></thead><tbody>';
+  for(const t of [0,0.4,0.5,0.6,0.7,0.8,0.9]){
+    const trusted=ev.filter(r=>(RESULTS[r.id].jev.confidence??0)>=t).length;
+    let ok=0,t3=0,t3n=0;
+    ev.forEach(r=>{const rec=RESULTS[r.id];let p=rec.jev.choice;if((rec.jev.confidence??0)<t)p=TIERS[Math.min(3,TIERS.indexOf(p)+1)];if(p===r.gold_tier)ok++;if(r.gold_tier==='T3'){t3n++;if(p==='T3')t3++;}});
+    const hl=Math.abs(t-thr)<1e-6?' class="hl"':'';
+    cur+=`<tr${hl}><td>${t.toFixed(2)}</td><td>${pct(trusted/ev.length)}</td><td>${pct(ok/ev.length)}</td><td>${t3n?pct(t3/t3n):'—'}</td></tr>`;
+  }
+  $('#bmCurve').innerHTML=cur+'</tbody></table>';
+  const wrong=ev.filter(r=>!RESULTS[r.id].correct).map(r=>({r,rec:RESULTS[r.id],under:TIERS.indexOf(RESULTS[r.id].jev.choice)<TIERS.indexOf(r.gold_tier)}));
+  wrong.sort((a,b)=>(b.under-a.under)||((a.rec.jev.confidence??0)-(b.rec.jev.confidence??0)));
+  $('#bmErrCount').textContent=`${wrong.length}/${ev.length} (${pct(wrong.length/ev.length)})`;
+  $('#bmErrors').innerHTML=wrong.slice(0,12).map(({r,rec,under})=>`<div class="errrow" data-id="${esc(r.id)}"><span class="${under?'bad':'stat'}">${under?'UNDER':'over'}</span> <b>${r.gold_tier}→${rec.jev.choice}</b> <span class="stat">conf ${(rec.jev.confidence??0).toFixed(2)}</span> <span class="prompt-inline">${esc(r.prompt.slice(0,90))}</span></div>`).join('')||'<span class="stat">no errors</span>';
+  $('#bmErrors').querySelectorAll('.errrow').forEach(el=>el.addEventListener('click',()=>{$('#search').value=el.dataset.id;applyFilters();}));
+}
+
 function applyFilters(){
   const q=$('#search').value.toLowerCase().trim(),ft=$('#fTier').value,fst=$('#fStatus').value,fs=$('#fStyle').value,wrong=$('#fWrong').checked,hide=$('#fHidePending').checked;
   let shown=0;
@@ -382,6 +465,7 @@ function applyFilters(){
 ['search','fTier','fStatus','fStyle','fWrong','fHidePending'].forEach(id=>{
   const el=document.getElementById(id);el.addEventListener('input',applyFilters);el.addEventListener('change',applyFilters);
 });
+$('#bmToggle').addEventListener('click',()=>{const b=$('#benchmarkBody');const shown=b.style.display!=='none';b.style.display=shown?'none':'';$('#bmToggle').textContent=shown?'show':'hide';});
 poll();
 </script>
 </body>
