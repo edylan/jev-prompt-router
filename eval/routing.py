@@ -46,6 +46,45 @@ def load_policy(path=None):
     return load_json(path or os.path.join(HERE, "policy.json"))
 
 
+_RUBRIC = None
+
+
+def load_rubric(path=None):
+    global _RUBRIC
+    if _RUBRIC is None:
+        p = path or os.path.join(HERE, "rubric.json")
+        _RUBRIC = load_json(p) if os.path.exists(p) else {}
+    return _RUBRIC
+
+
+def tier_from_nouls(nouls, rubric=None):
+    """Decomposed rubric: Noul values -> tier, using the recorded thresholds."""
+    r = rubric or load_rubric()
+    if r.get("mode") != "decomposed":
+        return None
+    thr = r.get("mapping_thresholds", {})
+    d, m = thr.get("deep", 0.5), thr.get("multistep", 0.5)
+    s, c = thr.get("single_step", 0.5), thr.get("context", 0.5)
+    if nouls.get("deep", 0) >= d:
+        return "T3"
+    if nouls.get("multistep", 0) >= m:
+        return "T2"
+    if nouls.get("single_step", 0) >= s and nouls.get("context", 0) < c:
+        return "T0"
+    return "T1"
+
+
+def effective_tier(rec):
+    """Tier for a result: re-derive from stored Nouls when present, so a change
+    to the rubric thresholds re-scores old runs without new API calls."""
+    j = rec.get("jev") or {}
+    if j.get("nouls"):
+        t = tier_from_nouls(j["nouls"])
+        if t:
+            return t
+    return j.get("choice")
+
+
 def estimate_tokens(text):
     return max(1, round(len(text) / 4))
 
@@ -153,7 +192,7 @@ def summarize(rows, results, policy, models, limit=None):
     errored = [x for x in done if (x.get("jev") or {}).get("error")]
 
     gold = [by_id[x["id"]]["gold_tier"] for x in ok]
-    pred = [(x.get("jev") or {}).get("choice") for x in ok]
+    pred = [effective_tier(x) for x in ok]
     n = len(ok)
     conf = [(x.get("jev") or {}).get("confidence") for x in ok if (x.get("jev") or {}).get("confidence") is not None]
 
@@ -187,7 +226,7 @@ def summarize(rows, results, policy, models, limit=None):
 
     route_by_id = {}
     for x in ok:
-        choice = (x.get("jev") or {}).get("choice")
+        choice = effective_tier(x)
         if choice not in IDX:
             continue
         row = by_id[x["id"]]

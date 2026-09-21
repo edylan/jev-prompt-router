@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
-from routing import load_registry_doc, load_policy, load_jsonl, summarize, route_row  # noqa: E402
+from routing import load_registry_doc, load_policy, load_jsonl, summarize, route_row, effective_tier  # noqa: E402
 
 LOCK = threading.Lock()
 STATE = {}
@@ -120,8 +120,11 @@ class Handler(BaseHTTPRequestHandler):
                     lite = {kk: vv for kk, vv in rec.items() if kk != "prompt"}
                     j = rec.get("jev") or {}
                     row = by_id.get(k)
-                    if row and j.get("choice") in ("T0", "T1", "T2", "T3"):
-                        lite["route"] = route_row(row, j["choice"], j.get("confidence"), policy, models)
+                    tier = effective_tier(rec)
+                    if row and tier in ("T0", "T1", "T2", "T3"):
+                        lite["route"] = route_row(row, tier, j.get("confidence"), policy, models)
+                        lite["jev"] = {**j, "choice": tier}
+                        lite["correct"] = tier == row["gold_tier"]
                     light[k] = lite
                 summary = summarize(STATE["rows"], results, policy, models)
                 self._send(200, json.dumps({
