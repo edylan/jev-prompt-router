@@ -112,7 +112,17 @@ async def classify_one(client, sem, row, prompt_field, policy, models):
         try:
             if RUBRIC_MODE == "decomposed":
                 from typesafe_sdk import Noul
-                qs = {name: Noul(instructions=spec["instructions"]) for name, spec in RUBRIC["questions"].items()}
+                try:
+                    from typesafe_sdk import NoulCriteria
+                except Exception:  # noqa: BLE001
+                    NoulCriteria = None
+
+                def _noul(spec):
+                    crit = spec.get("criteria")
+                    if crit and NoulCriteria is not None:
+                        return Noul(instructions=spec["instructions"], criteria=NoulCriteria(**crit))
+                    return Noul(instructions=spec["instructions"])
+                qs = {name: _noul(spec) for name, spec in RUBRIC["questions"].items()}
                 res = await client.system_one(row[prompt_field], qs)
                 nouls = {k: float(res.nouls[k].noul) for k in qs}
                 choice, deciding = map_tier(nouls)
@@ -173,7 +183,7 @@ async def run(args):
     if args.dry_run:
         print("\n--- dry run: request payload for the first row ---")
         if RUBRIC_MODE == "decomposed":
-            qs = {name: {"type": "noul", "instructions": spec["instructions"]} for name, spec in RUBRIC["questions"].items()}
+            qs = {name: {"type": "noul", "instructions": spec["instructions"], **({"criteria": spec["criteria"]} if spec.get("criteria") else {})} for name, spec in RUBRIC["questions"].items()}
         else:
             qs = {"tier": {"type": "choice", "instructions": QUESTION, "criteria": TIER_DEFS}}
         print(json.dumps({"state": todo[0][prompt_field] if todo else rows[0][prompt_field],

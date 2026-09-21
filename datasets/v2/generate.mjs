@@ -138,11 +138,21 @@ function renderTemplate(template, rng) {
 const seenTemplates = new Set();
 const templates = []; // {key, category, tier, source, split, template}
 let tplCounter = 0;
+// Label hardening: these were authored T2 but are single-pass transformations
+// (adapt / classify). Volume and taxonomy size are not capability differences,
+// so they are T1. Keyed by exact template text.
+const LABEL_FIXES = {
+  'Adapt the same product-delay announcement for customers, internal staff, and implementation partners, changing detail and tone appropriately for each audience.': 'T1',
+  'Classify 300 inbound procurement requests against the supplied 25-category taxonomy, return the top two labels with an evidence phrase for each, and route anything below the stated confidence to review.': 'T1',
+};
 function addTemplate(category, tier, source, template) {
   const n = norm(template);
   if (seenTemplates.has(n)) return;
   seenTemplates.add(n);
-  templates.push({ key: `${category}|${tier}|${source}|t${tplCounter++}`, category, tier, source, template });
+  const fix = LABEL_FIXES[template];
+  const labelFix = fix && fix !== tier ? { from: tier, to: fix } : null;
+  if (fix) tier = fix;
+  templates.push({ key: `${category}|${tier}|${source}|t${tplCounter++}`, category, tier, source, template, labelFix });
 }
 for (const category of Object.keys(V1_BANK.bank)) {
   for (const tier of TIERS) (V1_BANK.bank[category]?.[tier] ?? []).forEach((e) => addTemplate(category, tier, 'v1', e.template));
@@ -219,7 +229,8 @@ const businessRows = selected.map(({ tpl, core, variant }) => {
     prompt_with_ambient: [core, style_directive, requester_context].filter(Boolean).join(' '),
     gold_tier: tpl.tier,
     label_status: 'synthetic_prior',
-    labeling_rule: 'minimum_sufficient_capability',
+    labeling_rule: 'capability-v1',
+    label_fix: tpl.labelFix || null,
     rubric_version: 'v2',
     ...PROFILES[tpl.tier],
     tools_or_attachments_implied: /supplied|attached|transcript|workbook|logs|code|reports|documents|thread|filings|spreadsheets|source|artifact/i.test(core),
@@ -298,6 +309,8 @@ const manifest = {
   seed: `0x${SEED.toString(16)}`,
   rubric_version: 'v2',
   split_version: 'stratified-1',
+  label_rule: 'capability-v1',
+  label_fixes: Object.keys(LABEL_FIXES).length,
   counts: {
     business: business.length, harness: harness.length, total: all.length,
     business_templates: businessTemplates.size,

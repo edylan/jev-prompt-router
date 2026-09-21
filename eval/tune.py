@@ -44,16 +44,22 @@ def load_nouls(paths):
     return out
 
 
+FEATS = list(FEATURE_ORDER)
+
+
 def feats(nouls):
-    return [float(nouls.get(f, 0.0)) for f in FEATURE_ORDER]
+    return [float(nouls.get(f, 0.0)) for f in FEATS]
 
 
 # ---------------------------------------------------------------- candidate mappings
-def make_threshold_rule(d, m, s, c):
+def make_threshold_rule(thr):
+    d, m = thr.get("deep", 0.5), thr.get("multistep", 0.5)
+    p = thr.get("produces_analysis")
+    s, c = thr.get("single_step", 0.5), thr.get("context", 0.5)
     def rule(n):
         if n.get("deep", 0) >= d:
             return "T3"
-        if n.get("multistep", 0) >= m:
+        if (p is not None and n.get("produces_analysis", 0) >= p) or n.get("multistep", 0) >= m:
             return "T2"
         if n.get("single_step", 0) >= s and n.get("context", 0) < c:
             return "T0"
@@ -61,8 +67,8 @@ def make_threshold_rule(d, m, s, c):
     return rule
 
 
-def candidates(sklearn_ok):
-    yield ("thresholds", make_threshold_rule(0.8, 0.8, 0.4, 0.4), None)
+def candidates(sklearn_ok, thr):
+    yield ("thresholds", make_threshold_rule(thr), None)
     if not sklearn_ok:
         return
     from sklearn.linear_model import LogisticRegression
@@ -137,6 +143,10 @@ def main():
     print(f"dataset rows {len(rows)} · with Nouls {len(ids)} (missing {missing}) · dev {len(dev)} · test {len(test)}")
     gold = {i: rows[i]["gold_tier"] for i in ids}
     groups = {i: rows[i]["template_key"] for i in ids}
+    global FEATS
+    FEATS = [f for f in FEATURE_ORDER if all(f in nouls[i] for i in ids)]
+    thr = json.load(open(RUBRIC)).get("mapping_thresholds", {})
+    print(f"features available: {FEATS}")
 
     try:
         import sklearn  # noqa: F401
@@ -148,7 +158,7 @@ def main():
     print(f"\n=== candidates (grouped CV on dev, objective={a.objective}) ===")
     print(f"  {'candidate':30s} {'costErr':>8s} {'acc':>7s} {'macroF1':>8s} {'T3rec':>7s}")
     results = []
-    for name, model, kind in candidates(ok):
+    for name, model, kind in candidates(ok, thr):
         cost, acc, f1, t3, _ = cv_score(model, kind, dev, nouls, gold, [groups[i] for i in dev])
         results.append((cost if a.objective == "cost" else -acc, name, model, kind, cost, acc, f1, t3))
         print(f"  {name:30s} {cost:8.3f} {acc:7.1%} {f1:8.3f} {t3:7.1%}")
@@ -166,7 +176,7 @@ def main():
         clf = model.__class__(**model.get_params())
         clf.fit(array([feats(nouls[i]) for i in dev]), [gold[i] for i in dev])
         test_pred = [str(clf.predict([feats(nouls[i])])[0]) for i in test]
-        exported = export_linear(clf, FEATURE_ORDER) if kind == "linear" else {"type": "tree", "features": FEATURE_ORDER, "tree": export_tree(clf, FEATURE_ORDER)}
+        exported = export_linear(clf, FEATS) if kind == "linear" else {"type": "tree", "features": FEATS, "tree": export_tree(clf, FEATS)}
     tm = metrics([gold[i] for i in test], test_pred) if test else None
     if tm:
         print(f"held-out test (diagnostic): acc {tm['acc']:.1%} within1 {tm['within1']:.1%} macroF1 {tm['macro_f1']:.3f} T3rec {tm['t3_recall']:.1%} costErr {tm['cost']:.3f}")

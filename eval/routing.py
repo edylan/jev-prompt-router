@@ -57,7 +57,7 @@ def load_rubric(path=None):
     return _RUBRIC
 
 
-FEATURE_ORDER = ["single_step", "multistep", "deep", "context"]
+FEATURE_ORDER = ["single_step", "multistep", "produces_analysis", "deep", "context"]
 
 
 def _linear_tier(nouls, model):
@@ -91,10 +91,11 @@ def tier_from_nouls(nouls, rubric=None):
             pass
     thr = r.get("mapping_thresholds", {})
     d, m = thr.get("deep", 0.5), thr.get("multistep", 0.5)
+    p = thr.get("produces_analysis")
     s, c = thr.get("single_step", 0.5), thr.get("context", 0.5)
     if nouls.get("deep", 0) >= d:
         return "T3"
-    if nouls.get("multistep", 0) >= m:
+    if (p is not None and nouls.get("produces_analysis", 0) >= p) or nouls.get("multistep", 0) >= m:
         return "T2"
     if nouls.get("single_step", 0) >= s and nouls.get("context", 0) < c:
         return "T0"

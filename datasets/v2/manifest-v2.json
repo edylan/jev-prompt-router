@@ -4,6 +4,8 @@
   "seed": "0x5eed2026",
   "rubric_version": "v2",
   "split_version": "stratified-1",
+  "label_rule": "capability-v1",
+  "label_fixes": 2,
   "counts": {
     "business": 928,
     "harness": 72,
@@ -17,8 +19,8 @@
       "T3": 250
     },
     "by_split": {
-      "development": 216,
-      "test": 784
+      "development": 215,
+      "test": 785
     },
     "business_by_tier": {
       "T0": 232,
@@ -27,40 +29,40 @@
       "T3": 232
     },
     "business_by_split": {
-      "development": 192,
-      "test": 736
+      "development": 191,
+      "test": 737
     },
     "business_by_category": {
-      "business_strategy": 78,
+      "business_strategy": 77,
       "classification_extraction": 56,
       "data_spreadsheets": 86,
       "documents_summaries": 89,
       "email_communication": 43,
       "it_security_admin": 46,
       "market_competitive_research": 75,
-      "marketing_content": 113,
+      "marketing_content": 114,
       "meetings_collaboration": 36,
       "people_finance_legal_ops": 39,
       "presentations": 52,
-      "product_design": 69,
-      "sales_customer_support": 43,
+      "product_design": 70,
+      "sales_customer_support": 42,
       "software_engineering": 103
     },
     "business_by_function": {
       "analytics": 52,
       "customer_support": 31,
       "engineering": 103,
-      "executive_strategy": 114,
+      "executive_strategy": 113,
       "finance": 69,
       "general_administration": 65,
       "it_security": 46,
       "legal_compliance": 35,
-      "marketing": 113,
+      "marketing": 114,
       "operations": 55,
       "people_hr": 51,
-      "product": 69,
+      "product": 70,
       "research_insights": 75,
-      "sales": 50
+      "sales": 49
     },
     "harness_by_tier": {
       "T0": 18,
@@ -76,28 +78,28 @@
   },
   "integrity": {
     "templates_spanning_split": 0,
-    "dev_templates": 143,
-    "test_templates": 192,
+    "dev_templates": 142,
+    "test_templates": 193,
     "duplicate_canonical_prompts": 0,
     "harness_scenarios_spanning_split": 0,
     "dev_tier_share": {
-      "T0": 0.271,
-      "T1": 0.26,
-      "T2": 0.234,
-      "T3": 0.234
+      "T0": 0.272,
+      "T1": 0.262,
+      "T2": 0.23,
+      "T3": 0.236
     },
     "test_tier_share": {
-      "T0": 0.245,
+      "T0": 0.244,
       "T1": 0.247,
-      "T2": 0.254,
+      "T2": 0.255,
       "T3": 0.254
     }
   },
   "independence": {
     "note": "Governance and ambient fields are deliberately drawn independently of gold_tier. Cramers V near 0 = independent.",
-    "cramers_v_tier_vs_data_sensitivity": 0.0579,
-    "cramers_v_tier_vs_regulated_domain": 0.0435,
-    "cramers_v_tier_vs_residency": 0.0537,
+    "cramers_v_tier_vs_data_sensitivity": 0.0593,
+    "cramers_v_tier_vs_regulated_domain": 0.0413,
+    "cramers_v_tier_vs_residency": 0.0533,
     "tier_governance_table": {
       "T0": {
         "n": 232,
@@ -110,15 +112,15 @@
         "n": 232,
         "high_sensitivity": 0.147,
         "moderate_sensitivity": 0.345,
-        "regulated": 0.246,
+        "regulated": 0.254,
         "policy_check": 0.147
       },
       "T2": {
         "n": 232,
-        "high_sensitivity": 0.172,
+        "high_sensitivity": 0.168,
         "moderate_sensitivity": 0.276,
-        "regulated": 0.263,
-        "policy_check": 0.172
+        "regulated": 0.254,
+        "policy_check": 0.168
       },
       "T3": {
         "n": 232,

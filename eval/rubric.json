@@ -1,7 +1,7 @@
 {
-  "rubric_version": "2.0",
+  "rubric_version": "2.1",
   "frozen_at": null,
-  "status": "tuned_on_dev",
+  "status": "revision",
   "answer_semantics": "minimum_sufficient_tier",
   "mode": "decomposed",
   "tier_definitions": {
@@ -19,6 +19,14 @@
       "type": "noul",
       "instructions": "Reaching a reliable, professional result requires genuine multi-step reasoning, analysis, or synthesis, rather than merely rewriting, condensing, reformatting, or applying one rule."
     },
+    "produces_analysis": {
+      "type": "noul",
+      "instructions": "Answering reliably requires producing new analysis, diagnosis, design, recommendation, prioritisation, or a defensible judgement, as opposed to transforming, summarising, extracting, reformatting, adapting, translating, or classifying the content already provided.",
+      "criteria": {
+        "true": "producing something not present in the input, e.g. diagnosing a failure, designing an approach, recommending a decision, ranking options, forming an evidence-based judgement",
+        "false": "transforming what is already provided, e.g. rewriting, summarising, extracting, reformatting, adapting, translating, classifying, listing, or converting, however long or large the input is"
+      }
+    },
     "deep": {
       "type": "noul",
       "instructions": "The request involves deep ambiguity, conflicting or incomplete evidence, high-stakes judgment, long-horizon planning, or complex cross-system work, where a weaker model's errors would be costly."
@@ -29,14 +37,15 @@
     }
   },
   "mapping": [
-    "deep >= d            -> T3",
-    "multistep >= m       -> T2",
-    "single_step >= s and context < c -> T0",
-    "otherwise            -> T1"
+    "deep >= d                                -> T3",
+    "produces_analysis >= p or multistep >= m -> T2",
+    "single_step >= s and context < c         -> T0",
+    "otherwise                                -> T1"
   ],
   "mapping_thresholds": {
     "deep": 0.8,
     "multistep": 0.8,
+    "produces_analysis": 0.5,
     "single_step": 0.4,
     "context": 0.4
   },
@@ -57,6 +66,11 @@
     "Mentioning tools or attachments does not raise the tier by itself; the required judgment does.",
     "T1 vs T2 is the decisive boundary: T1 is rewriting, condensing, adapting, or reformatting with more context or constraints; T2 requires genuine multi-step reasoning or analysis.",
     "Any deep ambiguity, conflicting evidence, high stakes, long horizon, or cross-system integration is T3."
+  ],
+  "changes_from_v2_0": [
+    "Added a produces_analysis Noul with true/false anchors so the T1/T2 boundary is decidable: T1 transforms provided content, T2 produces new analysis/design/judgement.",
+    "Mapping treats produces_analysis as the primary T2 signal; multistep is secondary.",
+    "Label hardening (capability-v1): two scale-driven T2 labels corrected to T1 (adapt-for-three-audiences; classify-300-against-25-categories), since volume and taxonomy size are not capability differences."
   ],
   "changes_from_v1": [
     "Replaced one holistic 4-way Choice with four atomic Noul questions combined in code (fan-out / composite scoring).",
