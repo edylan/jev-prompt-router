@@ -149,6 +149,7 @@ class Handler(BaseHTTPRequestHandler):
                         lite["correct"] = tier == row["gold_tier"]
                     light[k] = lite
                 summary = summarize(rows, results, policy, models)
+                sim = any(rec.get("simulated") for rec in results.values()) if results else STATE["simulated"]
                 self._send(200, json.dumps({
                     "rows": rows, "results": light, "summary": summary,
                     "policy": policy,
@@ -157,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
                     "run": run_status(),
                     "log": log_tail(),
                     "meta": {"generated_at": STATE["generated_at"], "results_path": STATE["results"],
-                             "simulated": STATE["simulated"], "policy_sig": policy_sig(policy),
+                             "simulated": sim, "policy_sig": policy_sig(policy),
                              "can_run": STATE["can_run"], "suggest_mode": STATE["suggest_mode"],
                              "suggest_split": STATE["suggest_split"]},
                 }, default=str))
