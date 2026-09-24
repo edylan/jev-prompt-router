@@ -10,6 +10,10 @@ token-spend and model-usage visibility they currently lack at fleet scale.
 corpus of 1,000 corporate prompts. **End state:** every corporate GPU becomes
 shared inference capacity that any employee's prompt can be scheduled onto.
 
+## Demo
+
+🎬 **Watch the demo:** `TODO: paste YouTube link here`
+
 ## The one design rule
 
 **Capability tier (`T0`–`T3`) is classified by the model. Cost, vendor,
